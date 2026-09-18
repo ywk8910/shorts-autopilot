@@ -18,6 +18,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 2.663
+    },
+    {
+      "date": "2026-09-18",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "milestone",
+      "title": "WTI 유가(달러/배럴) 100달러선까지 0.2%",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -1.698
     }
   ],
   "weights": {}
