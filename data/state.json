@@ -48,6 +48,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -6.368
+    },
+    {
+      "date": "2026-09-18",
+      "topic_id": "mkt_wti",
+      "template": "counter",
+      "insight_kind": "life_translation",
+      "title": "국제 유가를 리터로 바꾸면 831원",
+      "video_id": "TL1I9PGfoCc",
+      "uploaded": true,
+      "change_pct": -6.26
     }
   ],
   "weights": {}
