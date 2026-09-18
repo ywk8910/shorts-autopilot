@@ -61,7 +61,8 @@ def main() -> int:
     else:
         print("[insight] 발동한 탐지기 없음 — 현황 서술로 대체")
 
-    script = generate(topic, cfg["llm"], cfg["safety"]["banned_title_words"], insight=insight)
+    script = generate(topic, cfg["llm"], cfg["safety"]["banned_title_words"], insight=insight,
+                      max_sec=cfg["video"].get("duration_sec_max", 50))
     print(json.dumps(script, ensure_ascii=False, indent=2))
 
     work = C.OUT_DIR / "work"

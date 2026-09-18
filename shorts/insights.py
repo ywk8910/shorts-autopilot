@@ -19,6 +19,8 @@ class Insight:
     hook: str                       # 첫 문장 (2초 훅)
     body: list[str] = field(default_factory=list)
     title: str = ""                 # 영상 제목 (없으면 hook 사용)
+    takeaway: str = ""              # 시청자가 가져갈 한 줄 (훅에 대한 답의 일반화)
+    next_line: str = ""             # 다음에 볼 이유 (pick에서 자동으로 채움)
 
 
 # ---------------------------------------------------------------- 유틸
@@ -88,12 +90,12 @@ def detect_recovery_asymmetry(topic: dict, others: list[dict]) -> Insight | None
         hook=f"{_j(name, '이가')} {abs(dd):.0f}% 빠졌는데, 왜 {need:.0f}%가 올라야 원래대로 돌아갈까요?",
         body=[
             f"오늘 {_j(name)} {_fmt(latest, unit)}입니다.",
-            f"{_kdate(hi_d, s[-1][0])} 고점 {_fmt(hi, unit)}에서 {abs(dd):.1f}% 내려온 자리입니다.",
+            f"{_kdate(hi_d, s[-1][0])} 고점 {_fmt(hi, unit)}에서 {abs(dd):.1f}% 내려왔고, 오늘로 {days}일째입니다.",
             f"그런데 그 고점을 되찾으려면 여기서 {need:.1f}%가 올라야 합니다.",
-            "내려간 비율보다 올라야 하는 비율이 항상 더 큽니다.",
-            "반토막 난 자산이 원위치하려면 100%가 필요한 것과 같은 이유입니다.",
-            f"고점 이후 오늘로 {days}일째입니다.",
+            "떨어질 때는 큰 숫자에서 빼고, 오를 때는 작아진 숫자에서 더하기 때문입니다.",
+            "반토막이 나면 100%가, 20% 빠지면 25%가 있어야 제자리입니다.",
         ],
+        takeaway="그래서 얼마나 빠졌는지보다, 얼마나 올라야 하는지로 보는 편이 실제에 가깝습니다.",
         title=f"{name} {abs(dd):.0f}% 하락, 되돌리려면 {need:.0f}% 필요한 이유",
     )
 
@@ -142,6 +144,7 @@ def detect_streak(topic: dict, others: list[dict]) -> Insight | None:
             f"올해 {n}일 이상 연속 {word}이 나온 건 이번이 {kth}번째입니다.",
             f"현재 수치는 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
+        takeaway=f"연속 기록은 그 자체로 방향을 말해주지 않습니다. 다만 {n}일이 이어진 건 올해 {kth}번뿐입니다.",
         title=f"{name} {n}일 연속 {word}, 올해 {kth}번째",
     )
 
@@ -180,6 +183,7 @@ def detect_rarity(topic: dict, others: list[dict]) -> Insight | None:
             detail,
             f"현재 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
+        takeaway=f"1년에 손에 꼽는 날이었다는 뜻입니다. 평소 하루 움직임은 이보다 훨씬 작습니다.",
         title=title,
     )
 
@@ -227,6 +231,7 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
     return Insight(
         kind="milestone",
         score=75.0 if abs(gap) <= 1.0 else 58.0,
+        takeaway=f"{tgt_s}선은 심리적인 기준일 뿐 실제 가치가 달라지는 선은 아닙니다. 다만 사람들이 가장 많이 세는 숫자입니다.",
         hook=f"{name}, {tgt_s}선까지 {abs(gap):.2f}% 남았습니다.",
         body=body,
         title=f"{name} {tgt_s}선까지 {abs(gap):.1f}%",
@@ -278,6 +283,7 @@ def detect_divergence(topic: dict, others: list[dict]) -> Insight | None:
             f"{_j(na)} {_fmt(topic['latest'], topic['unit'])}, "
             f"{_j(nb)} {_fmt(peer['latest'], peer['unit'])}입니다.",
         ],
+        takeaway="같은 시장 안에서도 큰 기업과 작은 기업에 다른 힘이 작용했다는 신호입니다.",
         title=f"{_j(na)} {ua}는데 {_j(nb)} {ub}다",
     )
 
@@ -311,6 +317,7 @@ def detect_life_translation(topic: dict, others: list[dict]) -> Insight | None:
                 f"같은 물건인데 {abs(diff):,.0f}원 차이가 납니다.",
                 f"3개월 새 환율이 {(latest / past - 1) * 100:+.1f}% 움직인 결과입니다.",
             ],
+            takeaway="환율 뉴스의 몇 퍼센트는 잘 안 와닿지만, 장바구니로 바꾸면 이만큼입니다.",
             title=f"100달러 직구, 3개월 만에 {abs(diff):,.0f}원 {word} 내는 이유",
         )
 
@@ -330,6 +337,7 @@ def detect_life_translation(topic: dict, others: list[dict]) -> Insight | None:
                 f"{_kdate(past_d, s[-1][0])}에는 {lit_then:,.0f}원이었습니다.",
                 "주유소 가격과 다른 이유는 세금과 정제·유통 비용이 빠진 원가이기 때문입니다.",
             ],
+            takeaway="주유소에서 내는 돈의 대부분은 기름값이 아니라 세금과 유통비라는 뜻이기도 합니다.",
             title=f"국제 유가를 리터로 바꾸면 {lit_now:,.0f}원",
         )
     return None
@@ -343,6 +351,39 @@ DETECTORS = [
     detect_divergence,
     detect_life_translation,
 ]
+
+
+def _watch_next(topic: dict, used_kind: str) -> str:
+    """다음에 볼 이유를 데이터에서 만든다. 매번 같은 마무리 문장을 쓰지 않기 위함.
+
+    예측이 아니라 '지켜볼 지점'만 제시한다. "오를 것"이라고 말하지 않는다.
+    """
+    s = _long(topic)
+    name, unit = topic["title_kw"], topic["unit"]
+    latest = s[-1][1]
+    vals = [v for _, v in s]
+
+    # 1순위: 가까운 라운드 숫자 (이정표 탐지기가 이미 쓴 경우는 건너뜀)
+    if used_kind != "milestone":
+        step = _round_step(latest)
+        up = (int(latest / step) + 1) * step
+        gap = (up / latest - 1) * 100
+        if gap <= 4.0:
+            return f"{name}, {up:,.0f}{unit}선까지는 {gap:.1f}% 남았습니다. 닿는 날 다시 정리하겠습니다."
+
+    # 2순위: 고점 회복까지 남은 거리 (복구 탐지기가 이미 쓴 경우는 건너뜀)
+    hi = max(vals)
+    need = (hi / latest - 1) * 100
+    if used_kind != "recovery_asymmetry" and need > 3:
+        return f"고점까지는 아직 {need:.0f}%가 남아 있습니다. 그 거리가 좁혀지면 다시 짚어 드리겠습니다."
+
+    # 3순위: 저점 대비 위치
+    lo = min(vals)
+    up_from_lo = (latest / lo - 1) * 100
+    if up_from_lo > 3:
+        return f"저점에서는 {up_from_lo:.0f}% 올라온 자리입니다. 내일 이 숫자가 어떻게 바뀌는지 이어서 보겠습니다."
+
+    return "내일도 숫자 하나로 정리해 드립니다."
 
 
 def pick(topic: dict, others: list[dict], recent_kinds: list[str] | None = None) -> Insight | None:
@@ -369,5 +410,8 @@ def pick(topic: dict, others: list[dict], recent_kinds: list[str] | None = None)
     # 직전 영상과 같은 종류는 대안이 있으면 아예 제외한다 (연속 반복 차단)
     last = recent[-1] if recent else None
     pool = [i for i in found if i.kind != last] or found
-    print(f"[insight] {log} -> {pool[0].kind}" + (f" (직전 {last} 제외)" if last and found[0].kind == last else ""))
-    return pool[0]
+    chosen = pool[0]
+    if not chosen.next_line:
+        chosen.next_line = _watch_next(topic, chosen.kind)
+    print(f"[insight] {log} -> {chosen.kind}" + (f" (직전 {last} 제외)" if last and found[0].kind == last else ""))
+    return chosen
