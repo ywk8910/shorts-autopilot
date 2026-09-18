@@ -38,6 +38,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 2.663
+    },
+    {
+      "date": "2026-09-18",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "divergence",
+      "title": "WTI 유가는 내렸는데 국제 금값은 올랐다",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -6.368
     }
   ],
   "weights": {}
