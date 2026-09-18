@@ -102,6 +102,22 @@ def _chart_png(series, fraction: float, unit: str, up: bool, font_path: str, w: 
     return Image.open(buf).convert("RGB")
 
 
+def _fit_lines(draw, text, font_path, max_w, max_lines=4, start=58, floor=38):
+    """문장 전체가 max_lines 안에 들어갈 때까지 폰트를 줄인다.
+
+    줄 수로 잘라내면 나레이션은 끝까지 읽는데 자막만 중간에 끊긴다.
+    """
+    size = start
+    while size > floor:
+        f = ImageFont.truetype(font_path, size)
+        lines = _wrap(draw, text, f, max_w)
+        if len(lines) <= max_lines:
+            return f, lines
+        size -= 4
+    f = ImageFont.truetype(font_path, floor)
+    return f, _wrap(draw, text, f, max_w)[:max_lines]
+
+
 def _hook_card(W, H, font_path, topic, big, hook, accent, t, dur, style):
     """0~dur초 동안 화면 전체를 쓰는 훅 카드. 첫 1초에 무슨 얘기인지 보이게 한다."""
     img = Image.new("RGB", (W, H), BG)
@@ -162,7 +178,7 @@ def render(topic: dict, script: dict, segs: list[dict], audio: Path, out_mp4: Pa
     # big이 없으면(인사이트 미발동) 종전처럼 바로 차트로 간다.
     big = (script.get("big") or "").strip()
     hook_txt = (script.get("hook") or (script["lines"][0] if script["lines"] else "")).strip()
-    hook_sec = min(segs[0]["dur"], 5.0) if (big and segs) else 0.0
+    hook_sec = min(segs[0]["dur"], 6.5) if (big and segs) else 0.0
     FADE = 0.3                               # 훅 카드 -> 본 화면 크로스페이드
 
     # 차트 성장 프레임 캐시 (60단계)
@@ -205,15 +221,19 @@ def render(topic: dict, script: dict, segs: list[dict], audio: Path, out_mp4: Pa
         img.paste(chart_cache[ci], (0, 520))
         d.text((60, 460), f"전일 대비 {topic['change_pct']:+.2f}%", font=f_sub, fill=accent)
 
-        # 자막
+        # 자막 — 전체 문장을 담고, 줄마다가 아니라 블록 하나에 배경을 깐다
         cur = next((txt for a, b, txt in timeline if a <= t < b), timeline[-1][2])
-        lines = _wrap(d, cur, f_sub, W - 140)[:3]
-        y = 1560 - (len(lines) - 1) * 70
+        f_cap, lines = _fit_lines(d, cur, font_path, W - 160, max_lines=4)
+        lh = f_cap.size + 20
+        block_h = len(lines) * lh
+        y0 = 1660 - block_h                     # 블록 아래쪽을 고정 (위로 자란다)
+        widest = max(d.textlength(ln, font=f_cap) for ln in lines)
+        d.rounded_rectangle([(W - widest) / 2 - 28, y0 - 16,
+                             (W + widest) / 2 + 28, y0 + block_h + 12], 18, fill=(0, 0, 0))
+        y = y0
         for ln in lines:
-            tw = d.textlength(ln, font=f_sub)
-            d.rounded_rectangle([(W - tw) / 2 - 24, y - 8, (W + tw) / 2 + 24, y + 70], 16, fill=(0, 0, 0))
-            d.text(((W - tw) / 2, y), ln, font=f_sub, fill=FG)
-            y += 78
+            d.text(((W - d.textlength(ln, font=f_cap)) / 2, y), ln, font=f_cap, fill=FG)
+            y += lh
 
         # 하단 출처
         foot = f"출처: {topic['source_name']} · 기준일 {topic['series'][-1][0]} · AI 음성"

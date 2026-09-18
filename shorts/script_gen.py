@@ -39,6 +39,15 @@ SEC_PER_CHAR = 0.16     # edge-tts ko-KR, rate +8% 실측 기준
 SEC_PER_PAUSE = 0.25
 
 
+def _split_sentences(lines: list[str]) -> list[str]:
+    """한 줄에 두 문장이 있으면 나눈다. 자막 한 장에는 한 문장만 올라가야 읽힌다."""
+    out = []
+    for ln in lines:
+        parts = [x.strip() for x in re.split(r"(?<=다\.)\s+", ln) if x.strip()]
+        out.extend(parts or [ln])
+    return out
+
+
 def _est_sec(lines: list[str]) -> float:
     return sum(len(l) for l in lines) * SEC_PER_CHAR + len(lines) * SEC_PER_PAUSE
 
@@ -125,6 +134,7 @@ def generate(topic: dict, llm_cfg: dict, banned: list[str], insight=None, max_se
     elif lines and CLOSING not in lines[-1]:
         lines.append(CLOSING)
 
+    lines = _split_sentences(lines)
     before = _est_sec(lines)
     lines = _fit(lines, max_sec, keep_tail=2 if insight else 1)
     if len(lines) != len(out["lines"]):
@@ -134,5 +144,5 @@ def generate(topic: dict, llm_cfg: dict, banned: list[str], insight=None, max_se
     out["insight_kind"] = insight.kind if insight else "none"
     # 훅 카드용 — 렌더러가 첫 화면에 크게 띄운다
     out["big"] = insight.big if insight else ""
-    out["hook"] = insight.hook if insight else (lines[0] if lines else "")
+    out["hook"] = lines[0] if lines else (insight.hook if insight else "")
     return out

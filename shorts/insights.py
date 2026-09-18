@@ -91,7 +91,7 @@ def detect_recovery_asymmetry(topic: dict, others: list[dict]) -> Insight | None
     return Insight(
         kind="recovery_asymmetry",
         score=min(95.0, abs(dd) * 2.5),
-        hook=f"{_j(name, '이가')} {abs(dd):.0f}% 빠졌는데, 왜 {need:.0f}%가 올라야 원래대로 돌아갈까요?",
+        hook=f"{abs(dd):.0f}% 빠진 {name}, 왜 {need:.0f}%가 올라야 제자리일까요?",
         body=[
             f"오늘 {_j(name)} {_fmt(latest, unit)}입니다.",
             f"최근 1년 고점은 {_kdate(hi_d, s[-1][0])}의 {_fmt(hi, unit)}, 거기서 {abs(dd):.1f}% 내려왔습니다.",
@@ -99,7 +99,7 @@ def detect_recovery_asymmetry(topic: dict, others: list[dict]) -> Insight | None
             "떨어질 때는 큰 숫자에서 빼고, 오를 때는 작아진 숫자에서 더하기 때문입니다.",
             "반토막이 나면 100%가, 20% 빠지면 25%가 있어야 제자리입니다.",
         ],
-        takeaway="그래서 얼마나 빠졌는지보다, 얼마나 올라야 하는지로 보는 편이 실제에 가깝습니다.",
+        takeaway="얼마나 빠졌는지보다 얼마나 올라야 하는지로 보는 편이 정확합니다.",
         big=f"-{abs(dd):.0f}% → +{need:.0f}%",
         title=f"{name} {abs(dd):.0f}% 하락, 되돌리려면 {need:.0f}% 필요한 이유",
     )
@@ -149,7 +149,7 @@ def detect_streak(topic: dict, others: list[dict]) -> Insight | None:
             f"올해 {n}일 이상 연속 {word}이 나온 건 이번이 {kth}번째입니다.",
             f"현재 수치는 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
-        takeaway=f"연속 기록은 그 자체로 방향을 말해주지 않습니다. 다만 {n}일이 이어진 건 올해 {kth}번뿐입니다.",
+        takeaway=f"연속 기록이 방향을 말해주지는 않습니다. 다만 올해 {kth}번뿐인 일입니다.",
         big=f"{n}일 연속 {word}",
         title=f"{name} {n}일 연속 {word}, 올해 {kth}번째",
     )
@@ -172,11 +172,11 @@ def detect_rarity(topic: dict, others: list[dict]) -> Insight | None:
     rank = bigger + 1                         # 오늘이 몇 번째로 큰 움직임인가
 
     if rank <= 5:                             # 드물면 순위로 말하는 편이 훨씬 세다
-        hook = f"오늘 {name} 움직임은 최근 1년 중 {rank}번째로 큰 폭입니다."
+        hook = f"{name}, 1년 중 {rank}번째로 큰 하루였습니다."
         title = f"{name} {topic['change_pct']:+.1f}%, 1년 중 {rank}번째로 큰 하루"
         detail = f"최근 {days}거래일 가운데 이보다 크게 움직인 날은 {bigger}일뿐입니다."
     else:
-        hook = f"오늘 {name} 움직임은 최근 1년 중 상위 {pct:.1f}%에 드는 폭입니다."
+        hook = f"{name}, 1년 중 상위 {pct:.1f}%에 드는 하루였습니다."
         title = f"{name} {topic['change_pct']:+.1f}%, 1년 중 상위 {pct:.1f}%"
         detail = f"최근 {days}거래일 중 이보다 크게 움직인 날은 {bigger}일입니다."
 
@@ -189,7 +189,7 @@ def detect_rarity(topic: dict, others: list[dict]) -> Insight | None:
             detail,
             f"현재 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
-        takeaway=f"1년에 손에 꼽는 날이었다는 뜻입니다. 평소 하루 움직임은 이보다 훨씬 작습니다.",
+        takeaway="1년에 손에 꼽는 날이었다는 뜻입니다.",
         big=(f"1년 중 {rank}번째" if rank <= 5 else f"상위 {pct:.1f}%"),
         title=title,
     )
@@ -254,19 +254,16 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
         if pos > 3.0:                     # 이미 한참 지나왔으면 이정표 이야기가 아니다
             continue
 
-        when = f"최근 {span} 만에 처음으로" if prev is None \
-            else f"{(_d(cross_date) - _d(prev)).days}일 만에"
-        verb = "넘어섰습니다" if going_up else "내줬습니다"
+        when = f"{span} 만의" if prev is None else f"{(_d(cross_date) - _d(prev)).days}일 만의"
+        word = "돌파" if going_up else "이탈"
 
-        # 오늘 넘었는지, 며칠 전에 넘고 머무는 중인지 구분한다
-        if bars <= 1:
-            hook = f"{_j(name, '이가')} {when} {tgt}선을 {verb}."
-        else:
-            hook = f"{_j(name, '이가')} {when} {tgt}선 {side_n}로 올라선 뒤 {bars}거래일째입니다." \
-                if going_up else \
-                f"{_j(name, '이가')} {when} {tgt}선을 내준 뒤 {bars}거래일째입니다."
+        # 훅은 짧게. 2초 안에 읽혀야 한다.
+        hook = f"{name}, {when} {tgt} {word}입니다."
 
         body = [f"오늘 {_j(name)} {_fmt(latest, unit)}, 그 선을 {pos:.2f}% {sideword} 있습니다."]
+        if bars > 1:
+            body.append(f"넘어선 지 {bars}거래일째입니다." if going_up
+                        else f"내준 지 {bars}거래일째입니다.")
         if prev is None:
             old_d, old_v = s[0]
             body.append(f"{_kdate(old_d, s[-1][0])}에는 {_fmt(old_v, unit)}였습니다. "
@@ -280,9 +277,8 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
             score=84.0 if prev is None else 78.0,
             hook=hook,
             body=body,
-            takeaway=(f"{tgt}처럼 0이 붙는 숫자는 가치를 바꾸지 않지만, "
-                      "사람들이 가장 많이 세는 숫자라 뉴스와 거래가 몰리는 자리입니다."),
-            title=f"{name}, {when} {tgt} {'돌파' if going_up else '이탈'}",
+            takeaway="0이 붙는 숫자가 가치를 바꾸지는 않지만, 사람들이 가장 많이 세는 자리입니다.",
+            title=f"{name}, {when} {tgt} {word}",
             big=f"{tgt} {'돌파' if going_up else '이탈'}",
         )
 
@@ -301,8 +297,7 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
             (f"마지막으로 그 위에 있던 날은 {_kdate(above[-1], s[-1][0])}입니다." if above
              else f"최근 {span} 동안 {tgt}를 넘은 적은 없습니다."),
         ],
-        takeaway=(f"{tgt}처럼 0이 붙는 숫자는 가치를 바꾸지 않지만, "
-                  "사람들이 가장 많이 세는 숫자라 뉴스와 거래가 몰리는 자리입니다."),
+        takeaway="0이 붙는 숫자가 가치를 바꾸지는 않지만, 사람들이 가장 많이 세는 자리입니다.",
         title=f"{name}, {tgt}선까지 {gap:.1f}%",
         big=f"{tgt}까지 {gap:.1f}%",
     )
@@ -353,7 +348,7 @@ def detect_divergence(topic: dict, others: list[dict]) -> Insight | None:
             f"{_j(na)} {_fmt(topic['latest'], topic['unit'])}, "
             f"{_j(nb)} {_fmt(peer['latest'], peer['unit'])}입니다.",
         ],
-        takeaway="같은 시장 안에서도 큰 기업과 작은 기업에 다른 힘이 작용했다는 신호입니다.",
+        takeaway="같은 시장에서도 대형주와 중소형주에 다른 힘이 작용했다는 신호입니다.",
         big=f"{a:+.1f}% vs {b:+.1f}%",
         title=f"{_j(na)} {ua}는데 {_j(nb)} {ub}다",
     )
@@ -388,7 +383,7 @@ def detect_life_translation(topic: dict, others: list[dict]) -> Insight | None:
                 f"같은 물건인데 {abs(diff):,.0f}원 차이가 납니다.",
                 f"3개월 새 환율이 {(latest / past - 1) * 100:+.1f}% 움직인 결과입니다.",
             ],
-            takeaway="환율 뉴스의 몇 퍼센트는 잘 안 와닿지만, 장바구니로 바꾸면 이만큼입니다.",
+            takeaway="몇 퍼센트는 잘 안 와닿지만 장바구니로 바꾸면 이만큼입니다.",
             big=f"{'+' if diff > 0 else '-'}{abs(diff):,.0f}원",
             title=f"100달러 직구, 3개월 만에 {abs(diff):,.0f}원 {word} 내는 이유",
         )
@@ -409,7 +404,7 @@ def detect_life_translation(topic: dict, others: list[dict]) -> Insight | None:
                 f"{_kdate(past_d, s[-1][0])}에는 {lit_then:,.0f}원이었습니다.",
                 "주유소 가격과 다른 이유는 세금과 정제·유통 비용이 빠진 원가이기 때문입니다.",
             ],
-            takeaway="주유소에서 내는 돈의 대부분은 기름값이 아니라 세금과 유통비라는 뜻이기도 합니다.",
+            takeaway="주유비의 대부분은 기름값이 아니라 세금과 유통비라는 뜻입니다.",
             big=f"리터 {lit_now:,.0f}원",
             title=f"국제 유가를 리터로 바꾸면 {lit_now:,.0f}원",
         )
@@ -441,20 +436,21 @@ def _watch_next(topic: dict, used_kind: str) -> str:
         step = _round_step(latest)
         up = (int(latest / step) + 1) * step
         gap = (up / latest - 1) * 100
+        tgt_next = f"{up:,.0f}{unit}"
         if gap <= 4.0:
-            return f"{name}, {up:,.0f}{unit}선까지는 {gap:.1f}% 남았습니다. 닿는 날 다시 정리하겠습니다."
+            return f"{name} {tgt_next}선까지는 {gap:.1f}% 남았습니다. 닿는 날 다시 정리하겠습니다."
 
     # 2순위: 고점 회복까지 남은 거리 (복구 탐지기가 이미 쓴 경우는 건너뜀)
     hi = max(vals)
     need = (hi / latest - 1) * 100
     if used_kind != "recovery_asymmetry" and need > 3:
-        return f"최근 1년 고점까지는 아직 {need:.0f}%가 남아 있습니다. 그 거리가 좁혀지면 다시 짚어 드리겠습니다."
+        return f"최근 1년 고점까지는 아직 {need:.0f}% 남았습니다. 좁혀지면 다시 짚어 드리겠습니다."
 
     # 3순위: 저점 대비 위치
     lo = min(vals)
     up_from_lo = (latest / lo - 1) * 100
     if up_from_lo > 3:
-        return f"최근 1년 저점에서는 {up_from_lo:.0f}% 올라온 자리입니다. 내일 이 숫자가 어떻게 바뀌는지 이어서 보겠습니다."
+        return f"최근 1년 저점에서는 {up_from_lo:.0f}% 올라온 자리입니다. 내일 이어서 보겠습니다."
 
     return "내일도 숫자 하나로 정리해 드립니다."
 

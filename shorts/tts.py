@@ -28,16 +28,26 @@ def _duration(path: Path) -> float:
     return float(r.stdout.strip())
 
 
+def _to_wav(src: Path, dst: Path, af: str | None = None) -> Path:
+    """WAV로 디코딩. mp3는 인코더 패딩이 붙어 길이가 미세하게 어긋나므로
+    중간 파일은 전부 WAV로 다룬다(자막-음성 싱크가 뒤로 갈수록 밀리는 원인)."""
+    cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(src)]
+    if af:
+        cmd += ["-af", af]
+    cmd += ["-ar", "44100", "-ac", "1", "-c:a", "pcm_s16le", str(dst)]
+    subprocess.run(cmd, check=True)
+    return dst
+
+
 def _trim(src: Path, dst: Path) -> Path:
-    """앞뒤 무음 제거. 결과가 비어 있으면 원본을 그대로 쓴다."""
+    """앞뒤 무음 제거 후 WAV로. 결과가 비었으면 자르지 않은 WAV를 쓴다."""
     try:
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(src),
-                        "-af", _TRIM_AF, "-q:a", "3", str(dst)], check=True)
+        _to_wav(src, dst, _TRIM_AF)
         if _duration(dst) >= 0.3:
             return dst
     except Exception as e:
         print(f"[tts] trim skipped ({e})")
-    return src
+    return _to_wav(src, dst.with_name(dst.stem + "_raw.wav"))
 
 
 async def _synth(text: str, out: Path, voice: str, rate: str) -> None:
@@ -53,12 +63,12 @@ def synthesize(lines: list[str], workdir: Path, voice_cfg: dict, silent: bool = 
         raw = workdir / f"raw_{i:02d}.mp3"
         if silent:
             dur = max(2.0, len(text) * 0.16)
-            subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
-                            "-t", f"{dur:.2f}", "-q:a", "9", str(raw)], check=True)
-            p = raw
+            p = workdir / f"seg_{i:02d}.wav"
+            subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
+                            "-t", f"{dur:.2f}", "-c:a", "pcm_s16le", str(p)], check=True)
         else:
             asyncio.run(_synth(text, raw, voice_cfg["name"], voice_cfg.get("rate", "+0%")))
-            p = _trim(raw, workdir / f"seg_{i:02d}.mp3")
+            p = _trim(raw, workdir / f"seg_{i:02d}.wav")
         segs.append({"text": text, "path": p, "dur": _duration(p) + PAUSE_SEC})
     total = sum(s["dur"] for s in segs)
     print(f"[tts] {len(segs)} segments, {total:.1f}s (pause {PAUSE_SEC}s)")
@@ -66,14 +76,19 @@ def synthesize(lines: list[str], workdir: Path, voice_cfg: dict, silent: bool = 
 
 
 def concat(segs: list[dict], out: Path) -> Path:
-    """세그먼트 사이에 PAUSE_SEC 무음을 넣어 하나의 mp3로 합칩니다."""
-    lst = out.parent / "concat.txt"
-    sil = out.parent / "sil.mp3"
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
-                    "-t", f"{PAUSE_SEC}", "-q:a", "9", str(sil)], check=True)
-    with open(lst, "w", encoding="utf-8") as f:
-        for s in segs:
-            f.write(f"file '{s['path'].resolve()}'\nfile '{sil.resolve()}'\n")
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst),
-                    "-ar", "44100", "-ac", "2", "-b:a", "128k", str(out)], check=True)
+    """세그먼트 사이에 PAUSE_SEC 무음을 넣어 하나로 합친다.
+
+    concat 디먹서로 mp3를 이어붙이면 파일마다 인코더 패딩(20~30ms)이 쌓여
+    뒤로 갈수록 자막과 음성이 어긋난다. 전부 디코딩해서 apad로 정확히 붙인다.
+    """
+    cmd = ["ffmpeg", "-y", "-v", "error"]
+    for seg in segs:
+        cmd += ["-i", str(seg["path"])]
+    n = len(segs)
+    chains = "".join(f"[{i}:a]aresample=44100,apad=pad_dur={PAUSE_SEC}[p{i}];" for i in range(n))
+    joins = "".join(f"[p{i}]" for i in range(n))
+    cmd += ["-filter_complex", f"{chains}{joins}concat=n={n}:v=0:a=1[out]",
+            "-map", "[out]", "-ac", "2", "-b:a", "128k", str(out)]
+    subprocess.run(cmd, check=True)
+    print(f"[tts] concat -> {_duration(out):.2f}s (예상 {sum(s['dur'] for s in segs):.2f}s)")
     return out
