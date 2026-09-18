@@ -1,0 +1,10 @@
+requests>=2.31
+pyyaml>=6.0
+matplotlib>=3.8
+pillow>=10.0
+edge-tts>=6.1
+anthropic>=0.40
+google-api-python-client>=2.140
+google-auth>=2.30
+google-auth-oauthlib>=1.2
+yfinance>=0.2.40

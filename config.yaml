@@ -1,0 +1,42 @@
+channel:
+  name: "오늘의 숫자"
+  language: ko
+  privacy: private          # Phase 1: private / Phase 2부터 public
+  publish_hour_kst: 7
+  max_uploads_per_day: 1
+  category_id: "28"         # Science & Technology (경제 해설도 대개 이 카테고리 사용)
+  default_tags: [데이터, 통계, 오늘의숫자, shorts]
+
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  duration_sec_max: 50
+  templates: [line, counter]   # 렌더 템플릿 로테이션 (bar_race는 데이터 형태가 맞을 때만 자동 선택)
+  font: "NotoSansCJK-Bold"     # 로컬 폰트 이름 또는 assets/fonts/*.ttf 경로
+  bgm: ""                      # assets/bgm.mp3 (YouTube 오디오 라이브러리에서 받은 파일만)
+
+voice:
+  engine: edge-tts
+  name: ko-KR-SunHiNeural
+  rate: "+8%"
+
+llm:
+  provider: anthropic          # anthropic | none  (none이면 템플릿 문장 사용)
+  model: claude-haiku-4-5
+  max_tokens: 400
+
+safety:
+  min_change_pct_to_post: 0.5   # 전일 대비 변동이 이보다 작으면 그날은 건너뜀
+  anomaly_change_pct: 50        # 이상치(데이터 오류 의심) → 업로드 중단 후 알림
+  same_topic_max_streak: 2      # 같은 주제 연속 업로드 상한
+  banned_title_words: [충격, 망했다, 무조건, 확정, 사야, 폭락, 폭등]
+
+sources:
+  - fx_rates                   # shorts/sources/fx_rates.py  (Frankfurter, 키 불필요)
+  - market                     # shorts/sources/market.py    (yfinance, 키 불필요) 코스피·코스닥·WTI·금
+  # - demo                     # 오프라인 테스트용 (네트워크 없이 파이프라인 확인)
+  # - kosis_population         # 추가 커넥터는 같은 인터페이스로 파일 하나씩 추가
+
+notify:
+  kakao_webhook_env: KAKAO_WEBHOOK_URL
