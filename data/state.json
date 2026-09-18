@@ -1,1 +1,15 @@
-{"history": [], "weights": {}}
+{
+  "history": [
+    {
+      "date": "2026-09-18",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "life_translation",
+      "title": "국제 유가를 리터로 바꾸면 834원",
+      "video_id": "VCVi0HhmkX4",
+      "uploaded": true,
+      "change_pct": -5.917
+    }
+  ],
+  "weights": {}
+}
