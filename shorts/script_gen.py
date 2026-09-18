@@ -14,6 +14,26 @@ SYSTEM = """당신은 한국어 데이터 해설 숏폼 대본 작가입니다.
 title은 35자 이내, 질문형 또는 숫자 포함형."""
 
 
+TAG_MAP = {
+    "코스피": ["#코스피", "#증시"],
+    "코스닥": ["#코스닥", "#증시"],
+    "유가": ["#유가", "#원자재"],
+    "금값": ["#금값", "#원자재"],
+    "환율": ["#환율", "#경제"],
+}
+
+
+def _tags(topic: dict) -> list[str]:
+    """소스가 지정한 태그를 우선하고, 없으면 주제명에서 유추한다."""
+    if topic.get("hashtags"):
+        return topic["hashtags"]
+    kw = topic.get("title_kw", "")
+    for k, v in TAG_MAP.items():
+        if k in kw:
+            return v + ["#오늘의숫자"]
+    return ["#데이터", "#경제", "#오늘의숫자"]
+
+
 def _fallback(topic: dict) -> dict:
     ctx = topic["context"]
     lines = [f"{topic['title_kw']}, 오늘 {topic['latest']:,.2f}{topic['unit']}입니다."] + ctx[1:] + [
@@ -21,7 +41,7 @@ def _fallback(topic: dict) -> dict:
     return {
         "title": f"{topic['title_kw']} 오늘 {topic['change_pct']:+.1f}%, 무슨 일이 있었나",
         "lines": lines[:7],
-        "hashtags": ["#환율", "#데이터", "#오늘의숫자"],
+        "hashtags": _tags(topic),
     }
 
 
@@ -55,4 +75,5 @@ def generate(topic: dict, llm_cfg: dict, banned: list[str]) -> dict:
             out = _fallback(topic)
     out["title"] = _clean_title(out["title"], banned)
     out["lines"] = [l.strip() for l in out["lines"] if l.strip()][:8]
+    out["hashtags"] = _tags(topic)   # LLM이 엉뚱한 태그를 붙이는 것 방지
     return out
