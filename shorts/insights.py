@@ -336,15 +336,21 @@ def detect_divergence(topic: dict, others: list[dict]) -> Insight | None:
             cnt += 1
     cnt = max(cnt, 1)                         # 오늘이 최소 1일
 
+    # 흔하면 뉴스가 아니다. 유가와 금값처럼 원래 자주 갈리는 짝은 여기서 걸러진다.
+    year_days = max(1, sum(1 for d in common if _d(d).year == year))
+    rate = cnt / year_days
+    if rate > 0.30:
+        return None
+
     ua, ub = ("올랐", "내렸") if a > 0 else ("내렸", "올랐")
     na, nb = topic["title_kw"], peer["title_kw"]
     return Insight(
         kind="divergence",
-        score=68.0 + (12 if cnt <= 10 else 0),
+        score=58.0 + (1 - rate) * 42,          # 드물수록 높은 점수
         hook=f"오늘 {_j(na)} {ua}는데 {_j(nb)} {ub}습니다.",
         body=[
             f"{na} {a:+.2f}%, {nb} {b:+.2f}%입니다.",
-            f"올해 두 지표가 반대로 움직인 날은 오늘 포함 {cnt}일입니다.",
+            f"올해 {year_days}거래일 중 두 지표가 반대로 간 날은 오늘 포함 {cnt}일뿐입니다.",
             f"{_j(na)} {_fmt(topic['latest'], topic['unit'])}, "
             f"{_j(nb)} {_fmt(peer['latest'], peer['unit'])}입니다.",
         ],
