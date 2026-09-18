@@ -5,10 +5,10 @@
 import yfinance as yf
 
 ITEMS = [
-    ("^KS11", "코스피 지수", "", "mkt_kospi"),
-    ("^KQ11", "코스닥 지수", "", "mkt_kosdaq"),
-    ("CL=F", "WTI 유가(달러/배럴)", "달러", "mkt_wti"),
-    ("GC=F", "국제 금값(달러/온스)", "달러", "mkt_gold"),
+    ("^KS11", "코스피 지수", "", "mkt_kospi", ["#코스피", "#증시", "#오늘의숫자"]),
+    ("^KQ11", "코스닥 지수", "", "mkt_kosdaq", ["#코스닥", "#증시", "#오늘의숫자"]),
+    ("CL=F", "WTI 유가(달러/배럴)", "달러", "mkt_wti", ["#유가", "#원자재", "#오늘의숫자"]),
+    ("GC=F", "국제 금값(달러/온스)", "달러", "mkt_gold", ["#금값", "#원자재", "#오늘의숫자"]),
 ]
 
 
@@ -30,16 +30,19 @@ def _facts(name: str, s: list[tuple[str, float]], unit: str) -> tuple[float, lis
 
 def fetch() -> list[dict]:
     out = []
-    for ticker, name, unit, tid in ITEMS:
-        df = yf.Ticker(ticker).history(period="4mo", interval="1d", auto_adjust=False)
+    for ticker, name, unit, tid, tags in ITEMS:
+        # long = 통계·희귀도 계산용 1년치, series = 차트에 그릴 최근 65거래일
+        df = yf.Ticker(ticker).history(period="1y", interval="1d", auto_adjust=False)
         if df is None or len(df) < 10:
             continue
-        s = [(d.strftime("%Y-%m-%d"), round(float(v), 2)) for d, v in df["Close"].dropna().items()][-65:]
+        long = [(d.strftime("%Y-%m-%d"), round(float(v), 2)) for d, v in df["Close"].dropna().items()]
+        s = long[-65:]
         chg, facts = _facts(name, s, unit)
         out.append({
-            "id": tid, "title_kw": name, "unit": unit, "series": s, "latest": s[-1][1],
+            "id": tid, "title_kw": name, "unit": unit, "series": s, "long": long, "latest": s[-1][1],
             "change_pct": chg, "context": facts,
             "source_name": "Yahoo Finance", "source_url": f"https://finance.yahoo.com/quote/{ticker}",
             "chart_kind": "line",
+            "hashtags": tags,
         })
     return out

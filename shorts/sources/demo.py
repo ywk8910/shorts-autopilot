@@ -6,11 +6,12 @@ from datetime import date, timedelta
 
 def fetch() -> list[dict]:
     random.seed(7)
-    s, v = [], 1380.0
-    for i in range(60):
-        d = date.today() - timedelta(days=60 - i)
+    long, v = [], 1380.0
+    for i in range(250):
+        d = date.today() - timedelta(days=250 - i)
         v = v * (1 + random.uniform(-0.006, 0.006)) + math.sin(i / 6) * 1.5
-        s.append((d.isoformat(), round(v, 2)))
+        long.append((d.isoformat(), round(v, 2)))
+    s = long[-60:]
     latest, prev = s[-1][1], s[-2][1]
     chg = (latest - prev) / prev * 100
     return [{
@@ -18,6 +19,7 @@ def fetch() -> list[dict]:
         "title_kw": "원/달러 환율(데모)",
         "unit": "원",
         "series": s,
+        "long": long,
         "latest": latest,
         "change_pct": chg,
         "context": [
@@ -29,4 +31,5 @@ def fetch() -> list[dict]:
         "source_name": "데모 데이터",
         "source_url": "https://example.com",
         "chart_kind": "line",
+        "hashtags": ["#환율", "#경제", "#오늘의숫자"],
     }]

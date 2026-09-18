@@ -11,6 +11,7 @@ from . import config as C
 from .sources import fetch_all
 from .select_topic import load_state, save_state, select, uploads_today
 from .script_gen import generate
+from .insights import pick as pick_insight
 from .tts import synthesize, concat
 from .render import render
 from .notify import send
@@ -53,7 +54,14 @@ def main() -> int:
         save_state(state)
         return 0
 
-    script = generate(topic, cfg["llm"], cfg["safety"]["banned_title_words"])
+    recent_kinds = [h.get("insight_kind", "none") for h in state["history"] if h.get("uploaded")]
+    insight = pick_insight(topic, topics, recent_kinds)
+    if insight:
+        print(f"[insight] 선택: {insight.kind} ({insight.score:.0f}점)")
+    else:
+        print("[insight] 발동한 탐지기 없음 — 현황 서술로 대체")
+
+    script = generate(topic, cfg["llm"], cfg["safety"]["banned_title_words"], insight=insight)
     print(json.dumps(script, ensure_ascii=False, indent=2))
 
     work = C.OUT_DIR / "work"
@@ -78,11 +86,13 @@ def main() -> int:
         uploaded = True
 
     state["history"].append({"date": today, "topic_id": topic["id"], "template": template,
+                             "insight_kind": script.get("insight_kind", "none"),
                              "title": script["title"], "video_id": video_id, "uploaded": uploaded,
                              "change_pct": round(topic["change_pct"], 3)})
     save_state(state)
     send(f"[shorts] {today} {'업로드 완료' if uploaded else '생성만 완료(dry-run)'}\n"
-         f"제목: {script['title']}\n주제: {topic['id']} ({topic['change_pct']:+.2f}%) / 템플릿 {template}\n"
+         f"제목: {script['title']}\n"
+         f"주제: {topic['id']} ({topic['change_pct']:+.2f}%) / 인사이트 {script.get('insight_kind')} / 템플릿 {template}\n"
          + (f"https://youtube.com/shorts/{video_id}" if video_id else ""))
     return 0
 

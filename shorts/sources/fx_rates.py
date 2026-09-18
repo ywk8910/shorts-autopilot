@@ -13,7 +13,7 @@ PAIRS = [
 ]
 
 
-def _series(base: str, mult: int, days: int = 90) -> list[tuple[str, float]]:
+def _series(base: str, mult: int, days: int = 370) -> list[tuple[str, float]]:
     start = (date.today() - timedelta(days=days)).isoformat()
     r = requests.get(f"{BASE}/{start}..", params={"from": base, "to": "KRW"}, timeout=20)
     r.raise_for_status()
@@ -42,20 +42,23 @@ def _facts(name: str, s: list[tuple[str, float]], unit: str) -> tuple[float, lis
 def fetch() -> list[dict]:
     out = []
     for base, mult, name, tid in PAIRS:
-        s = _series(base, mult)
-        if len(s) < 10:
+        long = _series(base, mult)
+        if len(long) < 10:
             continue
+        s = long[-65:]                       # 차트에 그릴 구간
         chg, facts = _facts(name, s, "원")
         out.append({
             "id": tid,
             "title_kw": name,
             "unit": "원",
             "series": s,
+            "long": long,                    # 통계·희귀도 계산용
             "latest": s[-1][1],
             "change_pct": chg,
             "context": facts,
             "source_name": "Frankfurter (ECB 고시 환율)",
             "source_url": "https://www.frankfurter.app",
             "chart_kind": "line",
+            "hashtags": ["#환율", "#경제", "#오늘의숫자"],
         })
     return out
