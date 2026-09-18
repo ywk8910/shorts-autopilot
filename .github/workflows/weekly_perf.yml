@@ -1,0 +1,35 @@
+name: weekly-perf
+
+on:
+  schedule:
+    - cron: "0 13 * * 0"      # 매주 일요일 22:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Collect analytics & update weights
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          KAKAO_WEBHOOK_URL: ${{ secrets.KAKAO_WEBHOOK_URL }}
+          PYTHONPATH: .
+        run: python scripts/collect_perf.py
+      - name: Commit
+        run: |
+          git config user.name  "shorts-bot"
+          git config user.email "shorts-bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "chore: weekly perf $(date -u +%F)"
+          git push
