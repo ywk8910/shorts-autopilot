@@ -78,23 +78,32 @@ def main() -> int:
 
     video_id, uploaded = None, False
     if not args.dry_run:
-        from .upload import upload
+        from .upload import upload, studio_link
         desc = "\n".join(script["lines"]) + f"\n\n출처: {topic['source_name']} {topic['source_url']}\n" \
                f"기준일: {topic['series'][-1][0]}\n음성은 AI 합성입니다.\n" + " ".join(script["hashtags"])
-        video_id = upload(out_mp4, script["title"], desc,
-                          cfg["channel"]["default_tags"] + [h.lstrip("#") for h in script["hashtags"]],
-                          cfg["channel"])
-        uploaded = True
+        try:
+            video_id = upload(out_mp4, script["title"], desc,
+                              cfg["channel"]["default_tags"] + [h.lstrip("#") for h in script["hashtags"]],
+                              cfg["channel"])
+            uploaded = True
+        except Exception as e:
+            send(f"[shorts] {today} 업로드 실패\n{type(e).__name__}: {e}\n"
+                 f"영상은 생성됐으니 Actions의 Artifacts에서 받아 수동으로 올릴 수 있습니다.")
+            raise
 
     state["history"].append({"date": today, "topic_id": topic["id"], "template": template,
                              "insight_kind": script.get("insight_kind", "none"),
                              "title": script["title"], "video_id": video_id, "uploaded": uploaded,
                              "change_pct": round(topic["change_pct"], 3)})
     save_state(state)
-    send(f"[shorts] {today} {'업로드 완료' if uploaded else '생성만 완료(dry-run)'}\n"
-         f"제목: {script['title']}\n"
-         f"주제: {topic['id']} ({topic['change_pct']:+.2f}%) / 인사이트 {script.get('insight_kind')} / 템플릿 {template}\n"
-         + (f"https://youtube.com/shorts/{video_id}" if video_id else ""))
+    msg = [f"[shorts] {today} {'업로드 완료 (비공개)' if uploaded else '생성만 완료(dry-run)'}",
+           f"제목: {script['title']}",
+           f"주제: {topic['id']} ({topic['change_pct']:+.2f}%)",
+           f"인사이트: {script.get('insight_kind')} / 템플릿 {template} / {len(script['lines'])}문장"]
+    if video_id:
+        from .upload import studio_link
+        msg.append(f"검수 후 공개: {studio_link(video_id)}")
+    send("\n".join(msg))
     return 0
 
 

@@ -8,3 +8,4 @@ google-api-python-client>=2.140
 google-auth>=2.30
 google-auth-oauthlib>=1.2
 yfinance>=0.2.40
+httplib2>=0.22
