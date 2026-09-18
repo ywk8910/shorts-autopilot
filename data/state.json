@@ -1,1 +1,14 @@
-{"history": [], "weights": {}}
+{
+  "history": [
+    {
+      "date": "2026-09-18",
+      "topic_id": "mkt_kospi",
+      "template": "line",
+      "title": "코스피 지수 오늘 +2.5%, 무슨 일이 있었나",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 2.543
+    }
+  ],
+  "weights": {}
+}
