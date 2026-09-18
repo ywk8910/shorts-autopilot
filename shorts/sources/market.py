@@ -7,8 +7,8 @@ import yfinance as yf
 ITEMS = [
     ("^KS11", "코스피 지수", "", "mkt_kospi", ["#코스피", "#증시", "#오늘의숫자"]),
     ("^KQ11", "코스닥 지수", "", "mkt_kosdaq", ["#코스닥", "#증시", "#오늘의숫자"]),
-    ("CL=F", "WTI 유가(달러/배럴)", "달러", "mkt_wti", ["#유가", "#원자재", "#오늘의숫자"]),
-    ("GC=F", "국제 금값(달러/온스)", "달러", "mkt_gold", ["#금값", "#원자재", "#오늘의숫자"]),
+    ("CL=F", "WTI 유가", "달러", "mkt_wti", ["#유가", "#원자재", "#오늘의숫자"]),
+    ("GC=F", "국제 금값", "달러", "mkt_gold", ["#금값", "#원자재", "#오늘의숫자"]),
 ]
 
 
@@ -20,7 +20,7 @@ def _facts(name: str, s: list[tuple[str, float]], unit: str) -> tuple[float, lis
     hi, lo = max(vals), min(vals)
     m20 = sum(vals[-20:]) / min(20, len(vals))
     facts = [
-        f"{latest_d} 기준 {name}은 {latest:,.2f}{unit}입니다.",
+        f"{latest_d} 기준 {name}은 {latest:,.2f}{unit}입니다.",   # 단위 상세는 context에서
         f"전 거래일 대비 {chg:+.2f}% 변동했습니다.",
         f"최근 90일 최고 {hi:,.2f}{unit}({s[vals.index(hi)][0]}), 최저 {lo:,.2f}{unit}({s[vals.index(lo)][0]})입니다.",
         f"최근 20거래일 평균 {m20:,.2f}{unit} 대비 {(latest - m20) / m20 * 100:+.2f}% 위치입니다.",

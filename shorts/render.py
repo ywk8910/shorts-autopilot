@@ -41,6 +41,17 @@ def _font_path(name: str) -> str:
     return fm.findfont(fm.FontProperties())
 
 
+def _fit_font(draw, text, font_path, max_w, start=200, floor=70):
+    """폭에 맞을 때까지 폰트를 줄인다. 훅 카드의 큰 글자는 길이가 매번 다르다."""
+    size = start
+    while size > floor:
+        f = ImageFont.truetype(font_path, size)
+        if draw.textlength(text, font=f) <= max_w:
+            return f
+        size -= 6
+    return ImageFont.truetype(font_path, floor)
+
+
 def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_w: int) -> list[str]:
     words, lines, cur = text.split(" "), [], ""
     for w in words:
@@ -91,6 +102,46 @@ def _chart_png(series, fraction: float, unit: str, up: bool, font_path: str, w: 
     return Image.open(buf).convert("RGB")
 
 
+def _hook_card(W, H, font_path, topic, big, hook, accent, t, dur, style):
+    """0~dur초 동안 화면 전체를 쓰는 훅 카드. 첫 1초에 무슨 얘기인지 보이게 한다."""
+    img = Image.new("RGB", (W, H), BG)
+    d = ImageDraw.Draw(img)
+    f_kw = ImageFont.truetype(font_path, 46)
+    f_hook = ImageFont.truetype(font_path, 62)
+    f_foot = ImageFont.truetype(font_path, 30)
+
+    ease = min(1.0, t / 0.45)                      # 0.45초에 걸쳐 나타남
+    ease = 1 - (1 - ease) ** 3
+
+    # 주제명
+    kw = topic["title_kw"]
+    d.text(((W - d.textlength(kw, font=f_kw)) / 2, 420), kw, font=f_kw, fill=MUTED)
+
+    # 큰 글자 (폭에 맞춰 자동 축소)
+    f_big = _fit_font(d, big, font_path, W - 120, start=210, floor=78)
+    bw = d.textlength(big, font=f_big)
+    by = 560 + int((1 - ease) * 40)
+    if style == "counter":                          # 변주: 뒤에 강조 블록
+        d.rounded_rectangle([(W - bw) / 2 - 40, by - 20, (W + bw) / 2 + 40, by + f_big.size + 30],
+                            24, fill=(int(accent[0] * 0.22), int(accent[1] * 0.22), int(accent[2] * 0.22)))
+    d.text(((W - bw) / 2, by), big, font=f_big,
+           fill=tuple(int(c * (0.35 + 0.65 * ease)) for c in accent))
+    if style != "counter":
+        d.rectangle([(W - bw) / 2, by + f_big.size + 34, (W + bw) / 2, by + f_big.size + 42], fill=accent)
+
+    # 훅 문장
+    if t > 0.35:
+        lines = _wrap(d, hook, f_hook, W - 140)[:4]
+        y = 1080
+        for ln in lines:
+            d.text(((W - d.textlength(ln, font=f_hook)) / 2, y), ln, font=f_hook, fill=FG)
+            y += 84
+
+    foot = f"출처: {topic['source_name']} · 기준일 {topic['series'][-1][0]} · AI 음성"
+    d.text((60, H - 90), foot, font=f_foot, fill=MUTED)
+    return img
+
+
 def render(topic: dict, script: dict, segs: list[dict], audio: Path, out_mp4: Path,
            video_cfg: dict, template: str = "line") -> Path:
     W, H, FPS = video_cfg["width"], video_cfg["height"], video_cfg["fps"]
@@ -106,7 +157,13 @@ def render(topic: dict, script: dict, segs: list[dict], audio: Path, out_mp4: Pa
     n_frames = int(total * FPS) + FPS // 3   # 오디오보다 0.3초 길게 (마지막 자막 여유)
     chart_h = 900
     grow_sec = 4.0
-    intro_sec = 2.0 if template == "counter" else 0.0
+
+    # 훅 카드: 첫 문장(=훅) 낭독이 끝날 때까지 화면 전체를 쓴다.
+    # big이 없으면(인사이트 미발동) 종전처럼 바로 차트로 간다.
+    big = (script.get("big") or "").strip()
+    hook_txt = (script.get("hook") or (script["lines"][0] if script["lines"] else "")).strip()
+    hook_sec = min(segs[0]["dur"], 5.0) if (big and segs) else 0.0
+    FADE = 0.3                               # 훅 카드 -> 본 화면 크로스페이드
 
     # 차트 성장 프레임 캐시 (60단계)
     steps = 60
@@ -142,21 +199,11 @@ def render(topic: dict, script: dict, segs: list[dict], audio: Path, out_mp4: Pa
             y += 78
         d.rectangle([60, y + 10, 60 + 160, y + 18], fill=accent)
 
-        # 카운터 인트로
-        if t < intro_sec:
-            frac = min(1.0, t / intro_sec)
-            val = topic["latest"] * (0.6 + 0.4 * frac)
-            txt = f"{val:,.2f}"
-            tw = d.textlength(txt, font=f_big)
-            d.text(((W - tw) / 2, 760), txt, font=f_big, fill=accent)
-            d.text(((W - d.textlength(topic["title_kw"], font=f_sub)) / 2, 940),
-                   topic["title_kw"], font=f_sub, fill=MUTED)
-        else:
-            frac = min(1.0, (t - intro_sec) / grow_sec)
-            ci = min(steps - 1, int(frac * steps))
-            img.paste(chart_cache[ci], (0, 520))
-            chg = f"{topic['change_pct']:+.2f}%"
-            d.text((60, 460), f"전일 대비 {chg}", font=f_sub, fill=accent)
+        # 차트 (훅 카드가 끝난 시점부터 자라기 시작)
+        frac = min(1.0, max(0.0, (t - hook_sec) / grow_sec))
+        ci = min(steps - 1, int(frac * steps))
+        img.paste(chart_cache[ci], (0, 520))
+        d.text((60, 460), f"전일 대비 {topic['change_pct']:+.2f}%", font=f_sub, fill=accent)
 
         # 자막
         cur = next((txt for a, b, txt in timeline if a <= t < b), timeline[-1][2])
@@ -171,6 +218,14 @@ def render(topic: dict, script: dict, segs: list[dict], audio: Path, out_mp4: Pa
         # 하단 출처
         foot = f"출처: {topic['source_name']} · 기준일 {topic['series'][-1][0]} · AI 음성"
         d.text((60, H - 90), foot, font=f_foot, fill=MUTED)
+
+        # 훅 카드 구간이면 덮어쓰고, 경계에서는 부드럽게 섞는다
+        if hook_sec > 0 and t < hook_sec + FADE:
+            card = _hook_card(W, H, font_path, topic, big, hook_txt, accent, t, hook_sec, template)
+            if t < hook_sec:
+                img = card
+            else:
+                img = Image.blend(card, img, (t - hook_sec) / FADE)
 
         ff.stdin.write(img.tobytes())
 

@@ -21,6 +21,7 @@ class Insight:
     title: str = ""                 # 영상 제목 (없으면 hook 사용)
     takeaway: str = ""              # 시청자가 가져갈 한 줄 (훅에 대한 답의 일반화)
     next_line: str = ""             # 다음에 볼 이유 (pick에서 자동으로 채움)
+    big: str = ""                   # 첫 2초 훅 카드에 크게 띄울 한 덩어리
 
 
 # ---------------------------------------------------------------- 유틸
@@ -37,8 +38,11 @@ def _long(topic: dict) -> list[tuple[str, float]]:
 
 def _fmt(v: float, unit: str) -> str:
     u = unit or "포인트"                      # 지수는 단위가 비어 있다
-    # 소수점은 100 미만(유가 등)에서만. "880.00포인트"처럼 읽히면 나레이션이 어색하다.
-    return f"{v:,.2f}{u}" if abs(v) < 100 else f"{v:,.0f}{u}"
+    # 1000 이상이거나 소수부가 없으면 정수로. 그 외에는 소수점을 살린다.
+    # (100.18을 "100달러"로 깎으면 "100달러선"과 구분이 안 된다)
+    if abs(v) >= 1000 or abs(v - round(v)) < 0.005:
+        return f"{v:,.0f}{u}"
+    return f"{v:,.2f}{u}"
 
 
 def _kdate(s: str, ref: str | None = None) -> str:
@@ -90,12 +94,13 @@ def detect_recovery_asymmetry(topic: dict, others: list[dict]) -> Insight | None
         hook=f"{_j(name, '이가')} {abs(dd):.0f}% 빠졌는데, 왜 {need:.0f}%가 올라야 원래대로 돌아갈까요?",
         body=[
             f"오늘 {_j(name)} {_fmt(latest, unit)}입니다.",
-            f"{_kdate(hi_d, s[-1][0])} 고점 {_fmt(hi, unit)}에서 {abs(dd):.1f}% 내려왔고, 오늘로 {days}일째입니다.",
+            f"최근 1년 고점은 {_kdate(hi_d, s[-1][0])}의 {_fmt(hi, unit)}, 거기서 {abs(dd):.1f}% 내려왔습니다.",
             f"그런데 그 고점을 되찾으려면 여기서 {need:.1f}%가 올라야 합니다.",
             "떨어질 때는 큰 숫자에서 빼고, 오를 때는 작아진 숫자에서 더하기 때문입니다.",
             "반토막이 나면 100%가, 20% 빠지면 25%가 있어야 제자리입니다.",
         ],
         takeaway="그래서 얼마나 빠졌는지보다, 얼마나 올라야 하는지로 보는 편이 실제에 가깝습니다.",
+        big=f"-{abs(dd):.0f}% → +{need:.0f}%",
         title=f"{name} {abs(dd):.0f}% 하락, 되돌리려면 {need:.0f}% 필요한 이유",
     )
 
@@ -145,6 +150,7 @@ def detect_streak(topic: dict, others: list[dict]) -> Insight | None:
             f"현재 수치는 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
         takeaway=f"연속 기록은 그 자체로 방향을 말해주지 않습니다. 다만 {n}일이 이어진 건 올해 {kth}번뿐입니다.",
+        big=f"{n}일 연속 {word}",
         title=f"{name} {n}일 연속 {word}, 올해 {kth}번째",
     )
 
@@ -184,57 +190,121 @@ def detect_rarity(topic: dict, others: list[dict]) -> Insight | None:
             f"현재 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
         takeaway=f"1년에 손에 꼽는 날이었다는 뜻입니다. 평소 하루 움직임은 이보다 훨씬 작습니다.",
+        big=(f"1년 중 {rank}번째" if rank <= 5 else f"상위 {pct:.1f}%"),
         title=title,
     )
 
 
 def _round_step(v: float) -> float:
+    """이정표 간격. 너무 촘촘하면 '95달러선' 같은 약한 이정표가 만들어진다."""
     if v >= 5000:
         return 500.0
     if v >= 1000:
         return 100.0
-    if v >= 100:
-        return 10.0
-    return 5.0
+    return 10.0
+
+
+def _span_word(days: int) -> str:
+    if days >= 330:
+        return "1년"
+    if days >= 55:
+        return f"{days // 30}개월"
+    return f"{days}일"
+
+
+def _cross(s: list[tuple[str, float]], level: float, up: bool):
+    """level을 방금 통과했는지. (통과일, 통과 후 경과 거래일, 직전에 그쪽이던 마지막 날|None).
+
+    핵심은 '언제 넘었나'가 아니라 '넘기 전에 마지막으로 그쪽이었던 게 언제인가'다.
+    어제 아래 있다가 오늘 넘은 걸 "1일 만"이라고 하면 이야기가 되지 않는다.
+    """
+    side = (lambda v: v >= level) if up else (lambda v: v < level)
+    i = len(s) - 1
+    while i >= 0 and side(s[i][1]):
+        i -= 1
+    cross_i = i + 1
+    if cross_i == 0:                      # 구간 내내 그쪽이었다 = 돌파 뉴스가 아니다
+        return None
+    bars = len(s) - cross_i               # 통과 후 머문 거래일 수 (1 = 오늘 통과)
+    if bars > 10:
+        return None
+    prev = next((s[k][0] for k in range(cross_i - 1, -1, -1) if side(s[k][1])), None)
+    return s[cross_i][0], bars, prev
 
 
 def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
-    """다음 라운드 숫자(이정표)까지 남은 거리와 고점·저점 이후 경과일."""
+    """라운드 숫자 돌파(상향·하향) 또는 근접."""
     s = _long(topic)
     name, unit = topic["title_kw"], topic["unit"]
     latest = s[-1][1]
     step = _round_step(latest)
-    up = (int(latest / step) + 1) * step
-    down = int(latest / step) * step
-    target, direction = (up, "회복") if (up - latest) < (latest - down) else (down, "이탈")
-    tgt_s = f"{target:,.0f}{unit}"      # 이정표는 "7,000선"처럼 단위어 없이
-    gap = (target / latest - 1) * 100
-    if abs(gap) > 3.0:
+    up_lv = (int(latest / step) + 1) * step
+    down_lv = int(latest / step) * step
+    span = _span_word((_d(s[-1][0]) - _d(s[0][0])).days)
+
+    for level, going_up in ((down_lv, True), (up_lv, False)):
+        got = _cross(s, level, going_up)
+        if not got:
+            continue
+        cross_date, bars, prev = got
+        tgt = f"{level:,.0f}{unit}"
+        side_n = "위" if going_up else "아래"
+        sideword = "웃돌고" if going_up else "밑돌고"
+        pos = abs(latest / level - 1) * 100
+        if pos > 3.0:                     # 이미 한참 지나왔으면 이정표 이야기가 아니다
+            continue
+
+        when = f"최근 {span} 만에 처음으로" if prev is None \
+            else f"{(_d(cross_date) - _d(prev)).days}일 만에"
+        verb = "넘어섰습니다" if going_up else "내줬습니다"
+
+        # 오늘 넘었는지, 며칠 전에 넘고 머무는 중인지 구분한다
+        if bars <= 1:
+            hook = f"{_j(name, '이가')} {when} {tgt}선을 {verb}."
+        else:
+            hook = f"{_j(name, '이가')} {when} {tgt}선 {side_n}로 올라선 뒤 {bars}거래일째입니다." \
+                if going_up else \
+                f"{_j(name, '이가')} {when} {tgt}선을 내준 뒤 {bars}거래일째입니다."
+
+        body = [f"오늘 {_j(name)} {_fmt(latest, unit)}, 그 선을 {pos:.2f}% {sideword} 있습니다."]
+        if prev is None:
+            old_d, old_v = s[0]
+            body.append(f"{_kdate(old_d, s[-1][0])}에는 {_fmt(old_v, unit)}였습니다. "
+                        f"그 사이 {(latest / old_v - 1) * 100:+.0f}% 움직였습니다.")
+        else:
+            body.append(f"직전에 {tgt} {side_n}에 있던 마지막 날은 {_kdate(prev, s[-1][0])}입니다.")
+            body.append(f"그 사이가 {(_d(cross_date) - _d(prev)).days}일입니다.")
+
+        return Insight(
+            kind="milestone",
+            score=84.0 if prev is None else 78.0,
+            hook=hook,
+            body=body,
+            takeaway=(f"{tgt}처럼 0이 붙는 숫자는 가치를 바꾸지 않지만, "
+                      "사람들이 가장 많이 세는 숫자라 뉴스와 거래가 몰리는 자리입니다."),
+            title=f"{name}, {when} {tgt} {'돌파' if going_up else '이탈'}",
+            big=f"{tgt} {'돌파' if going_up else '이탈'}",
+        )
+
+    gap = (up_lv / latest - 1) * 100
+    if gap > 3.0:
         return None
-
-    vals = [v for _, v in s]
-    hi_d, lo_d = s[vals.index(max(vals))][0], s[vals.index(min(vals))][0]
-    since_hi = (_d(s[-1][0]) - _d(hi_d)).days
-    since_lo = (_d(s[-1][0]) - _d(lo_d)).days
-    # 마지막으로 target 위에 있던 날
-    above = [dt for dt, v in s if v >= target]
-    last_above = above[-1] if above else None
-
-    body = [
-        f"오늘 {_j(name)} {_fmt(latest, unit)}입니다.",
-        f"{tgt_s}선까지 {abs(gap):.2f}%, {_fmt(abs(target - latest), unit)} 남았습니다.",
-    ]
-    if last_above and last_above != s[-1][0]:
-        body.append(f"마지막으로 그 위에 있던 날은 {_kdate(last_above, s[-1][0])}입니다.")
-    body.append(f"고점 이후 {since_hi}일, 저점 이후 {since_lo}일째입니다.")
-
+    tgt = f"{up_lv:,.0f}{unit}"
+    above = [dt for dt, v in s if v >= up_lv]
     return Insight(
         kind="milestone",
-        score=75.0 if abs(gap) <= 1.0 else 58.0,
-        takeaway=f"{tgt_s}선은 심리적인 기준일 뿐 실제 가치가 달라지는 선은 아닙니다. 다만 사람들이 가장 많이 세는 숫자입니다.",
-        hook=f"{name}, {tgt_s}선까지 {abs(gap):.2f}% 남았습니다.",
-        body=body,
-        title=f"{name} {tgt_s}선까지 {abs(gap):.1f}%",
+        score=75.0 if gap <= 1.0 else 58.0,
+        hook=f"{name}, {tgt}선까지 {gap:.2f}% 남았습니다.",
+        body=[
+            f"오늘 {_j(name)} {_fmt(latest, unit)}입니다.",
+            f"{tgt}까지는 {_fmt(up_lv - latest, unit)}, {gap:.2f}% 거리입니다.",
+            (f"마지막으로 그 위에 있던 날은 {_kdate(above[-1], s[-1][0])}입니다." if above
+             else f"최근 {span} 동안 {tgt}를 넘은 적은 없습니다."),
+        ],
+        takeaway=(f"{tgt}처럼 0이 붙는 숫자는 가치를 바꾸지 않지만, "
+                  "사람들이 가장 많이 세는 숫자라 뉴스와 거래가 몰리는 자리입니다."),
+        title=f"{name}, {tgt}선까지 {gap:.1f}%",
+        big=f"{tgt}까지 {gap:.1f}%",
     )
 
 
@@ -284,6 +354,7 @@ def detect_divergence(topic: dict, others: list[dict]) -> Insight | None:
             f"{_j(nb)} {_fmt(peer['latest'], peer['unit'])}입니다.",
         ],
         takeaway="같은 시장 안에서도 큰 기업과 작은 기업에 다른 힘이 작용했다는 신호입니다.",
+        big=f"{a:+.1f}% vs {b:+.1f}%",
         title=f"{_j(na)} {ua}는데 {_j(nb)} {ub}다",
     )
 
@@ -318,6 +389,7 @@ def detect_life_translation(topic: dict, others: list[dict]) -> Insight | None:
                 f"3개월 새 환율이 {(latest / past - 1) * 100:+.1f}% 움직인 결과입니다.",
             ],
             takeaway="환율 뉴스의 몇 퍼센트는 잘 안 와닿지만, 장바구니로 바꾸면 이만큼입니다.",
+            big=f"{'+' if diff > 0 else '-'}{abs(diff):,.0f}원",
             title=f"100달러 직구, 3개월 만에 {abs(diff):,.0f}원 {word} 내는 이유",
         )
 
@@ -338,6 +410,7 @@ def detect_life_translation(topic: dict, others: list[dict]) -> Insight | None:
                 "주유소 가격과 다른 이유는 세금과 정제·유통 비용이 빠진 원가이기 때문입니다.",
             ],
             takeaway="주유소에서 내는 돈의 대부분은 기름값이 아니라 세금과 유통비라는 뜻이기도 합니다.",
+            big=f"리터 {lit_now:,.0f}원",
             title=f"국제 유가를 리터로 바꾸면 {lit_now:,.0f}원",
         )
     return None
@@ -375,13 +448,13 @@ def _watch_next(topic: dict, used_kind: str) -> str:
     hi = max(vals)
     need = (hi / latest - 1) * 100
     if used_kind != "recovery_asymmetry" and need > 3:
-        return f"고점까지는 아직 {need:.0f}%가 남아 있습니다. 그 거리가 좁혀지면 다시 짚어 드리겠습니다."
+        return f"최근 1년 고점까지는 아직 {need:.0f}%가 남아 있습니다. 그 거리가 좁혀지면 다시 짚어 드리겠습니다."
 
     # 3순위: 저점 대비 위치
     lo = min(vals)
     up_from_lo = (latest / lo - 1) * 100
     if up_from_lo > 3:
-        return f"저점에서는 {up_from_lo:.0f}% 올라온 자리입니다. 내일 이 숫자가 어떻게 바뀌는지 이어서 보겠습니다."
+        return f"최근 1년 저점에서는 {up_from_lo:.0f}% 올라온 자리입니다. 내일 이 숫자가 어떻게 바뀌는지 이어서 보겠습니다."
 
     return "내일도 숫자 하나로 정리해 드립니다."
 

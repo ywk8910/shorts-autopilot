@@ -132,4 +132,7 @@ def generate(topic: dict, llm_cfg: dict, banned: list[str], insight=None, max_se
     out["lines"] = lines
     out["hashtags"] = _tags(topic)          # LLM이 엉뚱한 태그를 붙이는 것 방지
     out["insight_kind"] = insight.kind if insight else "none"
+    # 훅 카드용 — 렌더러가 첫 화면에 크게 띄운다
+    out["big"] = insight.big if insight else ""
+    out["hook"] = insight.hook if insight else (lines[0] if lines else "")
     return out
