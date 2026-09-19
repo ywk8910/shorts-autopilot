@@ -9,6 +9,16 @@
       "video_id": "VCVi0HhmkX4",
       "uploaded": true,
       "change_pct": -5.917
+    },
+    {
+      "date": "2026-09-19",
+      "topic_id": "mkt_kospi",
+      "template": "counter",
+      "insight_kind": "milestone",
+      "title": "코스피 지수, 3일 만의 7,000 이탈",
+      "video_id": "2322FFtN5UY",
+      "uploaded": true,
+      "change_pct": 2.663
     }
   ],
   "weights": {}
