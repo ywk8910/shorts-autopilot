@@ -19,6 +19,16 @@
       "video_id": "2322FFtN5UY",
       "uploaded": true,
       "change_pct": 2.663
+    },
+    {
+      "date": "2026-09-20",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "streak",
+      "title": "WTI 유가 4일 연속 하락, 올해 12번째",
+      "video_id": "28wNq2uNRKE",
+      "uploaded": true,
+      "change_pct": -4.247
     }
   ],
   "weights": {}
