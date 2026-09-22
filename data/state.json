@@ -39,6 +39,16 @@
       "video_id": "EIKyK2Wb34k",
       "uploaded": true,
       "change_pct": -8.056
+    },
+    {
+      "date": "2026-09-22",
+      "topic_id": "mkt_kospi",
+      "template": "line",
+      "insight_kind": "recovery_asymmetry",
+      "title": "코스피 지수 23% 하락, 되돌리려면 30% 필요한 이유",
+      "video_id": "N5ojbFPFozo",
+      "uploaded": true,
+      "change_pct": 1.646
     }
   ],
   "weights": {}
