@@ -59,6 +59,16 @@
       "video_id": "gv-RcjQtxh0",
       "uploaded": true,
       "change_pct": -2.463
+    },
+    {
+      "date": "2026-09-24",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "recovery_asymmetry",
+      "title": "WTI 유가 17% 하락, 되돌리려면 20% 필요한 이유",
+      "video_id": "_3PZcLV31gI",
+      "uploaded": true,
+      "change_pct": 2.062
     }
   ],
   "weights": {}
