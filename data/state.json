@@ -69,6 +69,16 @@
       "video_id": "_3PZcLV31gI",
       "uploaded": true,
       "change_pct": 2.062
+    },
+    {
+      "date": "2026-09-25",
+      "topic_id": "mkt_kosdaq",
+      "template": "counter",
+      "insight_kind": "milestone",
+      "title": "코스닥 지수, 34일 만의 840 돌파",
+      "video_id": "6U-lvhJ3c6g",
+      "uploaded": true,
+      "change_pct": 1.21
     }
   ],
   "weights": {}
