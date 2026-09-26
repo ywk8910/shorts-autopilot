@@ -79,6 +79,16 @@
       "video_id": "6U-lvhJ3c6g",
       "uploaded": true,
       "change_pct": 1.21
+    },
+    {
+      "date": "2026-09-26",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "life_translation",
+      "title": "국제 유가를 리터로 바꾸면 788원",
+      "video_id": "fCwAsfHSV4k",
+      "uploaded": true,
+      "change_pct": -2.325
     }
   ],
   "weights": {}
