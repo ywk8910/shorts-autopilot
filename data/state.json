@@ -109,6 +109,16 @@
       "video_id": "aqZz82J6Nm8",
       "uploaded": true,
       "change_pct": -3.842
+    },
+    {
+      "date": "2026-09-30",
+      "topic_id": "mkt_wti",
+      "template": "counter",
+      "insight_kind": "milestone",
+      "title": "WTI 유가, 29일 만의 90달러 이탈",
+      "video_id": "7A0NAXTDbm4",
+      "uploaded": true,
+      "change_pct": -3.704
     }
   ],
   "weights": {}
