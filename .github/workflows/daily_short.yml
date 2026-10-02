@@ -8,6 +8,9 @@ on:
       dry_run:
         description: "true면 업로드 없이 영상만 생성 (Artifacts로 다운로드)"
         default: "false"
+      force:
+        description: "true면 하루 상한·게시 기준(z, 변동률, 연속)을 무시하고 강제 생성 — 테스트용"
+        default: "false"
 
 permissions:
   contents: write
@@ -40,12 +43,13 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           KAKAO_WEBHOOK_URL: ${{ secrets.KAKAO_WEBHOOK_URL }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          FORCE: ${{ github.event.inputs.force || 'false' }}
         run: |
-          if [ "$DRY_RUN" = "true" ]; then
-            python -m shorts.main --dry-run
-          else
-            python -m shorts.main
-          fi
+          ARGS=""
+          if [ "$DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ "$FORCE" = "true" ]; then ARGS="$ARGS --force"; fi
+          echo "args:$ARGS"
+          python -m shorts.main $ARGS
 
       - name: Upload rendered video as artifact
         if: always()
