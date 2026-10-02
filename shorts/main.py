@@ -46,6 +46,7 @@ def main() -> int:
     safety = dict(cfg["safety"])
     if args.force:
         safety["min_change_pct_to_post"] = -1
+        safety["min_z_to_post"] = -1
         safety["same_topic_max_streak"] = 99
     topic, why = select(topics, state, safety)
     if topic is None:
@@ -76,8 +77,13 @@ def main() -> int:
     render(topic, script, segs, audio, out_mp4, cfg["video"], template=template)
     print(f"rendered: {out_mp4} ({template}, {sum(s['dur'] for s in segs):.1f}s)")
 
+    upload_on = cfg["channel"].get("upload_enabled", True)
+    if not upload_on and not args.dry_run:
+        print("[upload] config의 upload_enabled=false — 업로드를 건너뜁니다 "
+              "(검수 통과 후 true로 변경)")
+
     video_id, uploaded = None, False
-    if not args.dry_run:
+    if not args.dry_run and upload_on:
         from .upload import upload, studio_link
         desc = "\n".join(script["lines"]) + f"\n\n출처: {topic['source_name']} {topic['source_url']}\n" \
                f"기준일: {topic['series'][-1][0]}\n음성은 AI 합성입니다.\n" + " ".join(script["hashtags"])
@@ -96,7 +102,13 @@ def main() -> int:
                              "title": script["title"], "video_id": video_id, "uploaded": uploaded,
                              "change_pct": round(topic["change_pct"], 3)})
     save_state(state)
-    msg = [f"[shorts] {today} {'업로드 완료 (비공개)' if uploaded else '생성만 완료(dry-run)'}",
+    if uploaded:
+        head = "업로드 완료 (비공개)"
+    elif not upload_on:
+        head = "생성 완료 (업로드 보류 — 검수 대기)"
+    else:
+        head = "생성만 완료(dry-run)"
+    msg = [f"[shorts] {today} {head}",
            f"제목: {script['title']}",
            f"주제: {topic['id']} ({topic['change_pct']:+.2f}%)",
            f"인사이트: {script.get('insight_kind')} / 템플릿 {template} / {len(script['lines'])}문장"]
