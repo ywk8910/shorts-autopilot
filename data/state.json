@@ -129,6 +129,16 @@
       "video_id": "yzIpocMkMPU",
       "uploaded": true,
       "change_pct": 1.052
+    },
+    {
+      "date": "2026-10-02",
+      "topic_id": "mkt_kosdaq",
+      "template": "counter",
+      "insight_kind": "streak",
+      "title": "코스닥 지수 5일 연속 상승, 올해 7번째",
+      "video_id": "rvZK6MUGdBE",
+      "uploaded": true,
+      "change_pct": 5.135
     }
   ],
   "weights": {}
