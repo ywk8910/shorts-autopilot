@@ -4,6 +4,9 @@ channel:
   privacy: private          # private: 비공개 업로드 후 직접 공개 (검수 전에는 이 값만 유효)
                             # public : 검수 통과 후에만. publish_hour_kst에 예약 공개된다
   publish_hour_kst: 7
+  upload_enabled: false     # false면 영상만 만들고 업로드하지 않는다(Artifacts로 확인).
+                            # 검수(Compliance Audit) 통과 전에는 API 업로드가 비공개로
+                            # 영구히 잠기므로, 통과 후에 true로 바꿀 것
   max_uploads_per_day: 1
   category_id: "28"         # Science & Technology (경제 해설도 대개 이 카테고리 사용)
   default_tags: [데이터, 통계, 오늘의숫자, shorts]
@@ -28,7 +31,8 @@ llm:
   max_tokens: 400
 
 safety:
-  min_change_pct_to_post: 0.5   # 전일 대비 변동이 이보다 작으면 그날은 건너뜀
+  min_z_to_post: 1.0            # 그 지표 자신의 일간 변동 표준편차 대비 몇 배 이상이어야 게시
+  min_change_pct_to_post: 0.2   # 절대 하한. z가 높아도 움직임 자체가 미미하면 건너뜀
   anomaly_change_pct: 50        # 이상치(데이터 오류 의심) → 업로드 중단 후 알림
   same_topic_max_streak: 2      # 같은 주제 연속 업로드 상한
   banned_title_words: [충격, 망했다, 무조건, 확정, 사야, 폭락, 폭등]
