@@ -1,7 +1,18 @@
-"""주제 선별 — 변동률·가중치·연속 업로드 제한·이상치 규칙."""
+"""주제 선별 — 변동성 대비 희귀도(z), 최근 등장 빈도, 연속 제한, 이상치 규칙.
+
+왜 z로 비교하나:
+원래는 |전일 대비 %|로만 순위를 매겼다. 그러면 변동성이 큰 유가가 구조적으로
+매일 이긴다(실측: 14일 중 9일 64%가 유가, 환율은 0회). 코스피 2% 움직임과
+유가 2% 움직임은 같은 사건이 아니므로, 각 지표 자신의 일간 변동 표준편차로
+나눠 "그 지표 기준으로 얼마나 드문 날인가"를 비교한다.
+"""
 import json
+import statistics
 from datetime import date
 from .config import STATE_PATH
+
+RECENT_WINDOW = 7          # 최근 몇 편을 보고 편중을 판단할지
+REPEAT_PENALTY = 0.5       # 최근 창에서 1회 등장할 때마다 점수를 나누는 정도
 
 
 def load_state() -> dict:
@@ -30,20 +41,51 @@ def _streak(state: dict, topic_id: str) -> int:
     return n
 
 
+def _recent_count(state: dict, topic_id: str) -> int:
+    """최근 업로드 RECENT_WINDOW편 중 이 주제가 몇 번 나왔나."""
+    recent = [h["topic_id"] for h in state["history"] if h.get("uploaded")][-RECENT_WINDOW:]
+    return recent.count(topic_id)
+
+
+def zscore(topic: dict) -> float:
+    """오늘 변동률 ÷ 이 지표의 일간 변동 표준편차. 표본이 부족하면 1.0으로 중립 처리."""
+    s = topic.get("long") or topic["series"]
+    if len(s) < 31:
+        return 1.0
+    ch = [(s[i][1] / s[i - 1][1] - 1) * 100 for i in range(1, len(s))]
+    sd = statistics.pstdev(ch)
+    if sd <= 0:
+        return 0.0
+    return abs(topic["change_pct"]) / sd
+
+
 def select(topics: list[dict], state: dict, safety: dict) -> tuple[dict | None, str]:
     """(선택된 주제, 사유). 선택 불가 시 (None, 사유)."""
-    cands = []
+    min_z = safety.get("min_z_to_post", 1.0)
+    min_abs = safety.get("min_change_pct_to_post", 0.2)
+
+    cands, log = [], []
     for t in topics:
         chg = abs(t["change_pct"])
         if chg >= safety["anomaly_change_pct"]:
             return None, f"이상치 감지: {t['id']} {t['change_pct']:+.1f}% — 데이터 확인 필요"
-        if chg < safety["min_change_pct_to_post"]:
+
+        z = zscore(t)
+        if z < min_z or chg < min_abs:          # 평범한 날이거나 움직임 자체가 미미
             continue
         if _streak(state, t["id"]) >= safety["same_topic_max_streak"]:
             continue
+
         w = state["weights"].get(t["id"], 1.0)
-        cands.append((chg * w, t))
+        rep = _recent_count(state, t["id"])
+        score = z * w / (1 + REPEAT_PENALTY * rep)   # 최근에 자주 나온 주제는 감점
+        cands.append((score, t))
+        log.append(f"{t['id']}:z{z:.1f}" + (f"/최근{rep}회" if rep else ""))
+
     if not cands:
-        return None, "게시 기준을 넘는 변동이 있는 주제가 없음 (오늘은 건너뜀)"
+        return None, f"기준(z≥{min_z}, |변동|≥{min_abs}%)을 넘는 주제가 없음 (오늘은 건너뜀)"
+
     cands.sort(key=lambda x: -x[0])
-    return cands[0][1], f"score={cands[0][0]:.2f}"
+    print("[select] " + ", ".join(log))
+    best = cands[0]
+    return best[1], f"score={best[0]:.2f} (z={zscore(best[1]):.1f})"
