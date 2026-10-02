@@ -303,11 +303,11 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
     )
 
 
+# 같은 시장 안에서 움직이는 짝만 둔다.
+# 유가-금값은 원래 자주 갈려서 "반대로 움직였다"가 뉴스가 되지 않는다.
 PAIRS = {
     "mkt_kospi": "mkt_kosdaq",
     "mkt_kosdaq": "mkt_kospi",
-    "mkt_wti": "mkt_gold",
-    "mkt_gold": "mkt_wti",
 }
 
 
