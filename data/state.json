@@ -149,6 +149,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 0.433
+    },
+    {
+      "date": "2026-10-03",
+      "topic_id": "fx_eurkrw",
+      "template": "counter",
+      "insight_kind": "rarity",
+      "title": "원/유로 환율 -1.6%, 1년 중 3번째로 큰 하루",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -1.594
     }
   ],
   "weights": {}
