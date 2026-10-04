@@ -169,6 +169,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -1.594
+    },
+    {
+      "date": "2026-10-04",
+      "topic_id": "fx_usdkrw",
+      "template": "counter",
+      "insight_kind": "life_translation",
+      "title": "100달러 직구, 3개월 만에 15,664원 덜 내는 이유",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -0.954
     }
   ],
   "weights": {}
