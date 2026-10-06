@@ -69,6 +69,15 @@ def _j(word: str, pair: str = "은는") -> str:
     return word + (pair[0] if _batchim(word) else pair[1])
 
 
+def _was(word: str) -> str:
+    """'…이었습니다' / '…였습니다'. 받침이 있으면 '이'가 붙는다.
+
+    단위가 '원'(받침 O)이냐 '달러'(받침 X)냐에 따라 갈려서, 그냥 '였습니다'로 두면
+    "955.25원였습니다"처럼 읽힌다. TTS가 그대로 발음하므로 귀에 바로 걸린다.
+    """
+    return word + ("이었습니다" if _batchim(word) else "였습니다")
+
+
 def _changes(series: list[tuple[str, float]]) -> list[float]:
     return [(series[i][1] / series[i - 1][1] - 1) * 100 for i in range(1, len(series))]
 
@@ -266,7 +275,7 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
                         else f"내준 지 {bars}거래일째입니다.")
         if prev is None:
             old_d, old_v = s[0]
-            body.append(f"{_kdate(old_d, s[-1][0])}에는 {_fmt(old_v, unit)}였습니다. "
+            body.append(f"{_kdate(old_d, s[-1][0])}에는 {_was(_fmt(old_v, unit))}. "
                         f"그 사이 {(latest / old_v - 1) * 100:+.0f}% 움직였습니다.")
         else:
             body.append(f"직전에 {tgt} {side_n}에 있던 마지막 날은 {_kdate(prev, s[-1][0])}입니다.")
