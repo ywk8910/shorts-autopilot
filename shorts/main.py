@@ -4,6 +4,7 @@
 """
 import argparse
 import json
+import os
 import shutil
 
 from . import config as C
@@ -16,9 +17,45 @@ from .render import render
 from .notify import send
 
 
+RELEASE_TAG_PREFIX = "short-"
+
+
 def pick_template(state: dict, templates: list[str]) -> str:
     n = len(state["history"])
     return templates[n % len(templates)]
+
+
+def build_description(script: dict, topic: dict) -> str:
+    """YouTube 설명란에 그대로 들어갈 본문. 업로드를 자동으로 하든 손으로 하든 같은 글이다."""
+    return ("\n".join(script["lines"])
+            + f"\n\n출처: {topic['source_name']} {topic['source_url']}\n"
+            + f"기준일: {topic['series'][-1][0]}\n음성은 AI 합성입니다.\n"
+            + " ".join(script["hashtags"]))
+
+
+def download_url(today: str, filename: str) -> str:
+    """Release 자산 주소는 태그와 파일명만으로 정해진다.
+
+    덕분에 Release를 만들기 전인 이 시점에도 알림에 링크를 넣을 수 있다.
+    (Release는 영상 생성 뒤 워크플로가 만든다.)
+    """
+    repo = os.getenv("GITHUB_REPOSITORY", "ywk8910/shorts-autopilot")
+    return f"https://github.com/{repo}/releases/download/{RELEASE_TAG_PREFIX}{today}/{filename}"
+
+
+def write_upload_note(path, script: dict, desc: str, dl_url: str) -> None:
+    """손으로 올릴 때 붙여넣기만 하면 되도록 Release 본문에 쓸 메모를 만든다."""
+    body = "\n".join([
+        f"## {script['title']}", "",
+        f"**영상 받기 →** {dl_url}", "",
+        "### 제목", "```", script["title"], "```", "",
+        "### 설명", "```", desc, "```", "",
+        "### 태그", "```", " ".join(script["hashtags"]), "```", "",
+        "올리는 곳: YouTube 앱 → 만들기 → 동영상 업로드, 또는 studio.youtube.com",
+        "세로 영상에 60초 미만이라 Shorts로 자동 분류된다.",
+    ])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -76,6 +113,10 @@ def main() -> int:
     render(topic, script, segs, audio, out_mp4, cfg["video"], template=template)
     print(f"rendered: {out_mp4} ({template}, {sum(s['dur'] for s in segs):.1f}s)")
 
+    desc = build_description(script, topic)
+    dl_url = download_url(today, out_mp4.name)
+    write_upload_note(C.OUT_DIR / "upload_note.md", script, desc, dl_url)
+
     upload_on = cfg["channel"].get("upload_enabled", True)
     if not upload_on and not args.dry_run:
         print("[upload] config의 upload_enabled=false — 업로드를 건너뜁니다 "
@@ -84,8 +125,6 @@ def main() -> int:
     video_id, uploaded = None, False
     if not args.dry_run and upload_on:
         from .upload import upload, studio_link
-        desc = "\n".join(script["lines"]) + f"\n\n출처: {topic['source_name']} {topic['source_url']}\n" \
-               f"기준일: {topic['series'][-1][0]}\n음성은 AI 합성입니다.\n" + " ".join(script["hashtags"])
         try:
             video_id = upload(out_mp4, script["title"], desc,
                               cfg["channel"]["default_tags"] + [h.lstrip("#") for h in script["hashtags"]],
@@ -108,12 +147,16 @@ def main() -> int:
     else:
         head = "생성만 완료(dry-run)"
     msg = [f"[shorts] {today} {head}",
-           f"제목: {script['title']}",
            f"주제: {topic['id']} ({topic['change_pct']:+.2f}%)",
            f"인사이트: {script.get('insight_kind')} / 템플릿 {template} / {len(script['lines'])}문장"]
     if video_id:
         from .upload import studio_link
         msg.append(f"검수 후 공개: {studio_link(video_id)}")
+    else:
+        # 손으로 올리는 동안은 알림 자체가 작업 지시서다. 받는 링크와 붙여넣을 글을 같이 보낸다.
+        msg += ["", "▼ 영상 받기", dl_url,
+                "", "▼ 제목", script["title"],
+                "", "▼ 설명", desc]
     send("\n".join(msg))
     return 0
 
