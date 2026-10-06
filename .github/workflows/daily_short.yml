@@ -42,6 +42,9 @@ jobs:
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           KAKAO_WEBHOOK_URL: ${{ secrets.KAKAO_WEBHOOK_URL }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           FORCE: ${{ github.event.inputs.force || 'false' }}
         run: |
