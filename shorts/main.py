@@ -5,11 +5,10 @@
 import argparse
 import json
 import shutil
-from datetime import date
 
 from . import config as C
 from .sources import fetch_all
-from .select_topic import load_state, save_state, select, uploads_today
+from .select_topic import load_state, save_state, select, uploads_today, today_kst
 from .script_gen import generate
 from .insights import pick as pick_insight
 from .tts import synthesize, concat
@@ -32,7 +31,7 @@ def main() -> int:
 
     cfg = C.load()
     state = load_state()
-    today = date.today().isoformat()
+    today = today_kst()
 
     if uploads_today(state) >= cfg["channel"]["max_uploads_per_day"] and not args.force:
         send(f"[shorts] {today} 오늘 업로드 상한 도달, 종료")
