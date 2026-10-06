@@ -199,6 +199,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -0.668
+    },
+    {
+      "date": "2026-10-06",
+      "topic_id": "mkt_kosdaq",
+      "template": "line",
+      "insight_kind": "divergence",
+      "title": "코스닥 지수는 올랐는데 코스피 지수는 내렸다",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 2.649
     }
   ],
   "weights": {}
