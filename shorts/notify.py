@@ -28,7 +28,15 @@ def _kakao_access_token() -> str | None:
         "refresh_token": refresh,
     }, timeout=10)
     r.raise_for_status()
-    return r.json().get("access_token")
+    j = r.json()
+    if j.get("refresh_token"):
+        # 카카오는 리프레시 토큰 잔여기간이 1개월 미만일 때만 새 토큰을 같이 내려준다.
+        # 그때 시크릿을 갈아끼우지 않으면 한두 달 뒤 알림이 조용히 끊긴다.
+        # 토큰 값 자체는 로그에 남기지 않는다.
+        print("::warning::카카오가 새 리프레시 토큰을 발급했습니다. "
+              "이 저장소 시크릿 KAKAO_REFRESH_TOKEN을 갱신하지 않으면 "
+              "곧 알림이 끊깁니다. (kakao-fortune 쪽에서 갱신된 값을 그대로 복사하세요)")
+    return j.get("access_token")
 
 
 def _kakao_send(text: str, link: str | None) -> None:
