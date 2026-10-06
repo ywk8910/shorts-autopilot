@@ -8,11 +8,32 @@
 """
 import json
 import statistics
-from datetime import date
+from datetime import datetime, timedelta, timezone
 from .config import STATE_PATH
 
 RECENT_WINDOW = 7          # 최근 몇 편을 보고 편중을 판단할지
 REPEAT_PENALTY = 0.5       # 최근 창에서 1회 등장할 때마다 점수를 나누는 정도
+
+KST = timezone(timedelta(hours=9))
+
+
+def today_kst() -> str:
+    """하루의 경계는 KST 기준.
+
+    러너는 UTC로 돌고 GitHub 스케줄러는 cron 시각보다 2~4시간 늦게 뜬다.
+    그래서 date.today()(UTC)로 찍으면 어떤 실행은 23:4x Z, 다음 실행은 00:0x Z가 되어
+    같은 UTC 날짜에 두 번 기록되거나 하루가 통째로 비어 보인다(실측: 10/03이 2건).
+    """
+    return datetime.now(KST).date().isoformat()
+
+
+def _produced(h: dict) -> bool:
+    """이 기록이 실제로 영상을 만들었나. 건너뛴 날은 topic_id가 None이다.
+
+    업로드 여부로 판단하면 안 된다. 검수 대기 중(upload_enabled=false)에는
+    uploaded가 항상 False라서 하루 상한도, 편중 감점도 통째로 꺼진다.
+    """
+    return h.get("topic_id") is not None
 
 
 def load_state() -> dict:
@@ -27,8 +48,9 @@ def save_state(state: dict) -> None:
 
 
 def uploads_today(state: dict) -> int:
-    today = date.today().isoformat()
-    return sum(1 for h in state["history"] if h["date"] == today and h.get("uploaded"))
+    """오늘(KST) 이미 영상을 만든 횟수. 업로드 여부와 무관하다."""
+    today = today_kst()
+    return sum(1 for h in state["history"] if h["date"] == today and _produced(h))
 
 
 def _streak(state: dict, topic_id: str) -> int:
@@ -42,8 +64,8 @@ def _streak(state: dict, topic_id: str) -> int:
 
 
 def _recent_count(state: dict, topic_id: str) -> int:
-    """최근 업로드 RECENT_WINDOW편 중 이 주제가 몇 번 나왔나."""
-    recent = [h["topic_id"] for h in state["history"] if h.get("uploaded")][-RECENT_WINDOW:]
+    """최근 만든 RECENT_WINDOW편 중 이 주제가 몇 번 나왔나."""
+    recent = [h["topic_id"] for h in state["history"] if _produced(h)][-RECENT_WINDOW:]
     return recent.count(topic_id)
 
 
