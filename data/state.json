@@ -179,6 +179,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -0.954
+    },
+    {
+      "date": "2026-10-06",
+      "topic_id": "fx_jpykrw",
+      "template": "line",
+      "insight_kind": "milestone",
+      "title": "원/100엔 환율, 1년 만의 850원 이탈",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -0.668
     }
   ],
   "weights": {}
