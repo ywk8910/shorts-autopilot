@@ -60,6 +60,29 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Publish video as a release (수동 업로드용 직접 링크)
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mp4=$(ls out/*.mp4 2>/dev/null | head -n1 || true)
+          if [ -z "$mp4" ]; then
+            echo "오늘은 만든 영상이 없음 — Release 건너뜀"
+            exit 0
+          fi
+          # 파일명은 2026-10-06_fx_jpykrw.mp4 꼴. 앞의 날짜가 그대로 태그가 된다.
+          # shorts/main.py의 download_url()이 같은 규칙으로 링크를 미리 만들어 알림에 넣는다.
+          tag="short-$(basename "$mp4" .mp4 | cut -d_ -f1)"
+          notes=out/upload_note.md
+          [ -f "$notes" ] || printf '%s\n' "$(basename "$mp4")" > "$notes"
+          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" "$mp4" --title "$tag" --notes-file "$notes"
+          echo "released: $tag"
+          # 오래된 건 정리해서 Release 목록이 무한정 길어지지 않게 한다 (최근 14개 유지)
+          gh release list --limit 100 --json tagName -q '.[].tagName' \
+            | grep '^short-' | sort -r | tail -n +15 \
+            | xargs -r -I{} gh release delete {} --yes --cleanup-tag || true
+
       - name: Commit state
         run: |
           git config user.name  "shorts-bot"
