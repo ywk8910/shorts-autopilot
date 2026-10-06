@@ -6,6 +6,10 @@
 2) KAKAO_WEBHOOK_URL 이 있으면 그 주소로 POST 한다.
 3) 아무것도 없으면 로그에만 남는다.
 
+카카오는 2026년부터 새로 발급한 REST API 키에 클라이언트 시크릿을 기본으로
+켜 둔다. 켜져 있으면 토큰 요청에 client_secret을 같이 보내야 하므로,
+KAKAO_CLIENT_SECRET 이 있으면 함께 전송한다. (꺼져 있는 앱이면 없어도 된다)
+
 카카오 text 템플릿은 200자 제한이 있어서, 긴 본문은 보내지 않고 짧은 요약과
 링크만 보낸다. 제목·설명 전문은 어차피 Release 페이지에 있다.
 """
@@ -22,11 +26,15 @@ def _kakao_access_token() -> str | None:
     refresh = os.getenv("KAKAO_REFRESH_TOKEN")
     if not (key and refresh):
         return None
-    r = requests.post(TOKEN_URL, data={
+    data = {
         "grant_type": "refresh_token",
         "client_id": key,
         "refresh_token": refresh,
-    }, timeout=10)
+    }
+    secret = os.getenv("KAKAO_CLIENT_SECRET")
+    if secret:
+        data["client_secret"] = secret
+    r = requests.post(TOKEN_URL, data=data, timeout=10)
     r.raise_for_status()
     j = r.json()
     if j.get("refresh_token"):
@@ -34,8 +42,8 @@ def _kakao_access_token() -> str | None:
         # 그때 시크릿을 갈아끼우지 않으면 한두 달 뒤 알림이 조용히 끊긴다.
         # 토큰 값 자체는 로그에 남기지 않는다.
         print("::warning::카카오가 새 리프레시 토큰을 발급했습니다. "
-              "이 저장소 시크릿 KAKAO_REFRESH_TOKEN을 갱신하지 않으면 "
-              "곧 알림이 끊깁니다. (kakao-fortune 쪽에서 갱신된 값을 그대로 복사하세요)")
+              "저장소 시크릿 KAKAO_REFRESH_TOKEN을 갱신하지 않으면 곧 알림이 끊깁니다. "
+              "scripts/get_kakao_token.py 를 다시 실행해 발급받으세요.")
     return j.get("access_token")
 
 
