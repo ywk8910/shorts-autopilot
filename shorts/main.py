@@ -157,7 +157,8 @@ def main() -> int:
         msg += ["", "▼ 영상 받기", dl_url,
                 "", "▼ 제목", script["title"],
                 "", "▼ 설명", desc]
-    send("\n".join(msg))
+    short = f"[오늘의 숫자] {today}\n{script['title']}\n받아서 올리기 →"
+    send("\n".join(msg), short=short, link=(None if video_id else dl_url))
     return 0
 
 
