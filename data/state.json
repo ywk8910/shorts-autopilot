@@ -209,6 +209,12 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 2.649
+    },
+    {
+      "date": "2026-10-07",
+      "topic_id": null,
+      "uploaded": false,
+      "reason": "기준(z≥1.0, |변동|≥0.2%)을 넘는 주제가 없음 (오늘은 건너뜀)"
     }
   ],
   "weights": {}
