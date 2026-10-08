@@ -215,6 +215,16 @@
       "topic_id": null,
       "uploaded": false,
       "reason": "기준(z≥1.0, |변동|≥0.2%)을 넘는 주제가 없음 (오늘은 건너뜀)"
+    },
+    {
+      "date": "2026-10-08",
+      "topic_id": "fx_eurkrw",
+      "template": "line",
+      "insight_kind": "milestone",
+      "title": "원/유로 환율, 1년 만의 1,500원 이탈",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -0.823
     }
   ],
   "weights": {}
