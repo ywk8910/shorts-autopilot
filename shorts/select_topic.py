@@ -82,7 +82,16 @@ def zscore(topic: dict) -> float:
 
 
 def select(topics: list[dict], state: dict, safety: dict) -> tuple[dict | None, str]:
-    """(선택된 주제, 사유). 선택 불가 시 (None, 사유)."""
+    """(선택된 주제, 사유). 선택 불가 시 (None, 사유).
+
+    min_z는 '건너뛰는 선'이 아니라 '우선하는 선'이다.
+
+    처음에는 z < min_z면 그날을 통째로 건너뛰게 했는데, 지표들이 서로 붙어 움직여서
+    (환율끼리, 지수끼리) 사실상 독립된 그룹이 둘뿐이라 6일 중 4일이 건너뛰기로 끝났다.
+    매일 올리는 채널에서 절반을 쉬는 건 기준이 엄한 게 아니라 설계가 틀린 것이다.
+    그래서 드문 날(z≥min_z)을 우선 고르되, 그런 날이 없으면 그중 가장 나은 주제로
+    한 편을 만든다. 진짜로 아무것도 안 움직인 날(min_abs 미만)만 건너뛴다.
+    """
     min_z = safety.get("min_z_to_post", 1.0)
     min_abs = safety.get("min_change_pct_to_post", 0.2)
 
@@ -92,22 +101,25 @@ def select(topics: list[dict], state: dict, safety: dict) -> tuple[dict | None, 
         if chg >= safety["anomaly_change_pct"]:
             return None, f"이상치 감지: {t['id']} {t['change_pct']:+.1f}% — 데이터 확인 필요"
 
-        z = zscore(t)
-        if z < min_z or chg < min_abs:          # 평범한 날이거나 움직임 자체가 미미
+        if chg < min_abs:                       # 움직임 자체가 없는 날은 할 말이 없다
             continue
         if _streak(state, t["id"]) >= safety["same_topic_max_streak"]:
             continue
 
+        z = zscore(t)
         w = state["weights"].get(t["id"], 1.0)
         rep = _recent_count(state, t["id"])
         score = z * w / (1 + REPEAT_PENALTY * rep)   # 최근에 자주 나온 주제는 감점
-        cands.append((score, t))
-        log.append(f"{t['id']}:z{z:.1f}" + (f"/최근{rep}회" if rep else ""))
+        tier = 1 if z >= min_z else 0                # 드문 날을 먼저 본다
+        cands.append((tier, score, t))
+        log.append(f"{t['id']}:z{z:.1f}" + ("" if tier else "(평범)")
+                   + (f"/최근{rep}회" if rep else ""))
 
     if not cands:
-        return None, f"기준(z≥{min_z}, |변동|≥{min_abs}%)을 넘는 주제가 없음 (오늘은 건너뜀)"
+        return None, f"움직임이 |{min_abs}%| 이상인 지표가 없음 (오늘은 건너뜀)"
 
-    cands.sort(key=lambda x: -x[0])
+    cands.sort(key=lambda x: (-x[0], -x[1]))
     print("[select] " + ", ".join(log))
-    best = cands[0]
-    return best[1], f"score={best[0]:.2f} (z={zscore(best[1]):.1f})"
+    tier, score, best = cands[0]
+    kind = f"드문 날 z≥{min_z}" if tier else "평범한 날 중 최선"
+    return best, f"{kind}, score={score:.2f} (z={zscore(best):.1f})"
