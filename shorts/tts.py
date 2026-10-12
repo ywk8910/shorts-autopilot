@@ -57,10 +57,22 @@ async def _edge(text: str, out: Path, voice: str, rate: str) -> None:
     await edge_tts.Communicate(text, voice, rate=rate).save(str(out))
 
 
+GTTS_TEMPO = 1.15         # gTTS는 edge-tts보다 느리다. 실측 56.4초(목표 50초) → 1.15로 보정
+
+
 def _gtts(text: str, out: Path) -> None:
-    """대체 엔진. 속도 조절이 안 되고 음색도 다르지만 채널이 멈추는 것보다 낫다."""
+    """대체 엔진.
+
+    gTTS는 읽는 속도를 지정할 수 없고 edge-tts(rate +8%)보다 느려서, 그대로 쓰면
+    대본 길이 계산(script_gen의 초/글자 추정)과 어긋나 영상이 60초를 넘길 수 있다.
+    60초를 넘으면 Shorts로 분류되지 않으므로 합성 직후 atempo로 속도만 맞춘다.
+    """
     from gtts import gTTS
-    gTTS(text=text, lang="ko").save(str(out))
+    tmp = out.with_name(out.stem + "_gtts_raw.mp3")
+    gTTS(text=text, lang="ko").save(str(tmp))
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(tmp),
+                    "-filter:a", f"atempo={GTTS_TEMPO}", str(out)], check=True)
+    tmp.unlink(missing_ok=True)
 
 
 def _speak(text: str, out: Path, voice_cfg: dict, engine: str | None) -> str:
