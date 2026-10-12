@@ -6,8 +6,10 @@ PAUSE_SEC 간격으로 이어붙입니다.
 """
 import asyncio
 import subprocess
+import time
 from pathlib import Path
 
+EDGE_RETRIES = 3          # edge-tts가 403을 내는 날이 있다. 몇 번 보고 안 되면 대체 엔진
 PAUSE_SEC = 0.25          # 문장 사이 간격
 TRIM_THRESHOLD = "-50dB"  # 이보다 조용하면 무음으로 간주
 
@@ -50,15 +52,48 @@ def _trim(src: Path, dst: Path) -> Path:
     return _to_wav(src, dst.with_name(dst.stem + "_raw.wav"))
 
 
-async def _synth(text: str, out: Path, voice: str, rate: str) -> None:
+async def _edge(text: str, out: Path, voice: str, rate: str) -> None:
     import edge_tts
     await edge_tts.Communicate(text, voice, rate=rate).save(str(out))
+
+
+def _gtts(text: str, out: Path) -> None:
+    """대체 엔진. 속도 조절이 안 되고 음색도 다르지만 채널이 멈추는 것보다 낫다."""
+    from gtts import gTTS
+    gTTS(text=text, lang="ko").save(str(out))
+
+
+def _speak(text: str, out: Path, voice_cfg: dict, engine: str | None) -> str:
+    """한 문장을 읽어 out에 저장하고, 실제로 쓴 엔진 이름을 돌려준다.
+
+    edge-tts가 쓰는 Microsoft 엔드포인트는 때때로 403을 돌려준다(실측: 2026-10-12,
+    GitHub Actions에서 재시도 두 번 모두 403). 서비스 쪽 사정이라 우리가 고칠 수 없고,
+    그렇다고 채널을 멈출 수는 없으니 몇 번 재시도한 뒤 gTTS로 넘어간다.
+    엔진은 실행마다 한 번만 정한다. 문장마다 목소리가 바뀌면 더 이상하다.
+    """
+    if engine == "gtts":
+        _gtts(text, out)
+        return "gtts"
+
+    last = None
+    for attempt in range(EDGE_RETRIES):
+        try:
+            asyncio.run(_edge(text, out, voice_cfg["name"], voice_cfg.get("rate", "+0%")))
+            return "edge"
+        except Exception as e:
+            last = e
+            if attempt + 1 < EDGE_RETRIES:
+                time.sleep(2 * (attempt + 1))
+    print(f"[tts] edge-tts 실패({type(last).__name__}: {str(last)[:80]}) — gTTS로 전환합니다")
+    _gtts(text, out)
+    return "gtts"
 
 
 def synthesize(lines: list[str], workdir: Path, voice_cfg: dict, silent: bool = False) -> list[dict]:
     """[{text, path, dur}] — silent=True면 무음 파일 생성(오프라인 테스트용)."""
     workdir.mkdir(parents=True, exist_ok=True)
     segs = []
+    engine = None
     for i, text in enumerate(lines):
         raw = workdir / f"raw_{i:02d}.mp3"
         if silent:
@@ -67,9 +102,11 @@ def synthesize(lines: list[str], workdir: Path, voice_cfg: dict, silent: bool = 
             subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
                             "-t", f"{dur:.2f}", "-c:a", "pcm_s16le", str(p)], check=True)
         else:
-            asyncio.run(_synth(text, raw, voice_cfg["name"], voice_cfg.get("rate", "+0%")))
+            engine = _speak(text, raw, voice_cfg, engine)
             p = _trim(raw, workdir / f"seg_{i:02d}.wav")
         segs.append({"text": text, "path": p, "dur": _duration(p) + PAUSE_SEC})
+    if engine:
+        print(f"[tts] engine={engine}")
     total = sum(s["dur"] for s in segs)
     print(f"[tts] {len(segs)} segments, {total:.1f}s (pause {PAUSE_SEC}s)")
     return segs
