@@ -3,6 +3,7 @@ pyyaml>=6.0
 matplotlib>=3.8
 pillow>=10.0
 edge-tts>=6.1
+gtts>=2.5          # edge-tts가 403을 내는 날의 대체 엔진
 anthropic>=0.40
 google-api-python-client>=2.140
 google-auth>=2.30
