@@ -5,6 +5,9 @@ edge-tts가 내주는 mp3는 앞뒤에 0.5초 안팎의 무음이 붙어 있어,
 PAUSE_SEC 간격으로 이어붙입니다.
 """
 import asyncio
+import base64
+import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -75,9 +78,68 @@ def _gtts(text: str, out: Path) -> None:
     tmp.unlink(missing_ok=True)
 
 
+GCLOUD_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
+GCLOUD_VOICE = "ko-KR-Neural2-A"   # 여성 한국어. Neural2는 월 100만 자까지 무료(사용량 월 9천 자)
+_gcloud_token: list = [None, 0.0]  # (토큰, 만료 epoch) — 한 실행 안에서 재사용
+
+
+def _gcloud_access_token() -> str | None:
+    """서비스 계정 JSON(시크릿 GCP_TTS_KEY)으로 액세스 토큰을 얻는다.
+
+    google-cloud-texttospeech 패키지를 따로 깔지 않는다. 이미 유튜브 업로드용으로
+    google-auth가 들어와 있고, 필요한 건 REST 한 번 호출할 토큰뿐이다.
+    키가 없으면 None — 조용히 edge-tts로 넘어간다.
+    """
+    raw = os.getenv("GCP_TTS_KEY", "").strip()
+    if not raw:
+        return None
+    tok, exp = _gcloud_token
+    if tok and time.time() < exp - 60:
+        return tok
+    from google.oauth2 import service_account
+    from google.auth.transport.requests import Request
+    creds = service_account.Credentials.from_service_account_info(
+        json.loads(raw), scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    creds.refresh(Request())
+    _gcloud_token[0] = creds.token
+    _gcloud_token[1] = creds.expiry.timestamp() if creds.expiry else time.time() + 3000
+    return creds.token
+
+
+def _rate_to_speed(rate: str) -> float:
+    """edge-tts식 "+8%"를 Cloud TTS의 speakingRate(1.08)로 바꾼다. 같은 설정을 두 번 쓰지 않도록."""
+    try:
+        return 1.0 + int(rate.strip().rstrip("%")) / 100.0
+    except Exception:
+        return 1.0
+
+
+def _gcloud(text: str, out: Path, voice_cfg: dict) -> None:
+    """Google Cloud Text-to-Speech. 1순위 엔진.
+
+    edge-tts(Microsoft 비공식 엔드포인트)는 403을 내는 날이 있어 채널이 며칠씩 멈췄다.
+    여기는 정식 API라 그런 일이 없고, 이 사용량에서는 요금도 0원이다.
+    """
+    import requests
+    token = _gcloud_access_token()
+    if not token:
+        raise RuntimeError("GCP_TTS_KEY 없음")
+    body = {
+        "input": {"text": text},
+        "voice": {"languageCode": "ko-KR", "name": GCLOUD_VOICE},
+        "audioConfig": {"audioEncoding": "MP3",
+                        "speakingRate": _rate_to_speed(voice_cfg.get("rate", "+0%"))},
+    }
+    r = requests.post(GCLOUD_URL, json=body, timeout=30,
+                      headers={"Authorization": f"Bearer {token}"})
+    r.raise_for_status()
+    out.write_bytes(base64.b64decode(r.json()["audioContent"]))
+
+
 def _speak(text: str, out: Path, voice_cfg: dict, engine: str | None) -> str:
     """한 문장을 읽어 out에 저장하고, 실제로 쓴 엔진 이름을 돌려준다.
 
+    순서는 gcloud → edge → gtts. 앞의 것이 안 되면 다음으로 내려간다.
     edge-tts가 쓰는 Microsoft 엔드포인트는 때때로 403을 돌려준다(실측: 2026-10-12,
     GitHub Actions에서 재시도 두 번 모두 403). 서비스 쪽 사정이라 우리가 고칠 수 없고,
     그렇다고 채널을 멈출 수는 없으니 몇 번 재시도한 뒤 gTTS로 넘어간다.
@@ -86,6 +148,16 @@ def _speak(text: str, out: Path, voice_cfg: dict, engine: str | None) -> str:
     if engine == "gtts":
         _gtts(text, out)
         return "gtts"
+    if engine == "gcloud":
+        _gcloud(text, out, voice_cfg)
+        return "gcloud"
+
+    if engine is None and os.getenv("GCP_TTS_KEY", "").strip():
+        try:
+            _gcloud(text, out, voice_cfg)
+            return "gcloud"
+        except Exception as e:
+            print(f"[tts] Cloud TTS 실패({type(e).__name__}: {str(e)[:120]}) — edge-tts로 시도합니다")
 
     last = None
     for attempt in range(EDGE_RETRIES):
