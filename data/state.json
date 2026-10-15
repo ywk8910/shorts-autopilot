@@ -309,6 +309,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -5.465
+    },
+    {
+      "date": "2026-10-16",
+      "topic_id": "fx_jpykrw",
+      "template": "counter",
+      "insight_kind": "rarity",
+      "title": "원/100엔 환율 +1.0%, 1년 중 상위 7.4%",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 0.986
     }
   ],
   "weights": {}
