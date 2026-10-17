@@ -329,6 +329,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -7.654
+    },
+    {
+      "date": "2026-10-18",
+      "topic_id": "fx_eurkrw",
+      "template": "counter",
+      "insight_kind": "milestone",
+      "title": "원/유로 환율, 2일 만의 1,500원 이탈",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -0.628
     }
   ],
   "weights": {}
