@@ -359,6 +359,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 4.464
+    },
+    {
+      "date": "2026-10-21",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "milestone",
+      "title": "WTI 유가, 5일 만의 100달러 이탈",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -5.142
     }
   ],
   "weights": {}
