@@ -379,6 +379,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -3.763
+    },
+    {
+      "date": "2026-10-23",
+      "topic_id": "mkt_gold",
+      "template": "line",
+      "insight_kind": "recovery_asymmetry",
+      "title": "국제 금값 24% 하락, 되돌리려면 32% 필요한 이유",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -2.675
     }
   ],
   "weights": {}
