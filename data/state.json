@@ -399,6 +399,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 3.82
+    },
+    {
+      "date": "2026-10-26",
+      "topic_id": "mkt_kosdaq",
+      "template": "line",
+      "insight_kind": "recovery_asymmetry",
+      "title": "코스닥 지수 39% 하락, 되돌리려면 63% 필요한 이유",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -1.624
     }
   ],
   "weights": {}
