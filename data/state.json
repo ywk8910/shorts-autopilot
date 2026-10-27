@@ -409,6 +409,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -1.624
+    },
+    {
+      "date": "2026-10-27",
+      "topic_id": "fx_jpykrw",
+      "template": "counter",
+      "insight_kind": "milestone",
+      "title": "원/100엔 환율, 3일 만의 840원 돌파",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -0.346
     }
   ],
   "weights": {}
