@@ -469,6 +469,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -3.83
+    },
+    {
+      "date": "2026-11-03",
+      "topic_id": "mkt_wti",
+      "template": "counter",
+      "insight_kind": "rarity",
+      "title": "WTI 유가 -7.1%, 1년 중 상위 4.8%",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -7.126
     }
   ],
   "weights": {}
