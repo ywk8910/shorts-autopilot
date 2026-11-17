@@ -599,6 +599,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -0.87
+    },
+    {
+      "date": "2026-11-17",
+      "topic_id": "mkt_wti",
+      "template": "line",
+      "insight_kind": "recovery_asymmetry",
+      "title": "WTI 유가 25% 하락, 되돌리려면 33% 필요한 이유",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -3.805
     }
   ],
   "weights": {}
