@@ -609,6 +609,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -3.805
+    },
+    {
+      "date": "2026-11-18",
+      "topic_id": "fx_jpykrw",
+      "template": "counter",
+      "insight_kind": "milestone",
+      "title": "원/100엔 환율, 21일 만의 840원 이탈",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 0.289
     }
   ],
   "weights": {}
