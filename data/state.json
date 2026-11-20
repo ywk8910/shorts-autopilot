@@ -629,6 +629,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -2.984
+    },
+    {
+      "date": "2026-11-20",
+      "topic_id": "mkt_gold",
+      "template": "counter",
+      "insight_kind": "rarity",
+      "title": "국제 금값 -4.7%, 1년 중 4번째로 큰 하루",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -4.661
     }
   ],
   "weights": {}
