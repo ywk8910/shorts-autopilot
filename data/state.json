@@ -639,6 +639,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": -4.661
+    },
+    {
+      "date": "2026-11-21",
+      "topic_id": "fx_jpykrw",
+      "template": "line",
+      "insight_kind": "rarity",
+      "title": "원/100엔 환율 +1.7%, 1년 중 5번째로 큰 하루",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 1.67
     }
   ],
   "weights": {}
