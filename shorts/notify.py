@@ -75,5 +75,11 @@ def send(text: str, short: str | None = None, link: str | None = None,
         if url:
             requests.post(url, json={"text": text}, timeout=10)
     except Exception as e:
-        # 알림 실패가 영상 생성을 망치면 안 된다.
-        print(f"[notify] failed: {type(e).__name__}: {e}")
+        # 알림 실패가 영상 생성을 망치면 안 된다. 다만 조용히 묻혀서도 안 된다.
+        # 리프레시 토큰이 죽으면 영상은 계속 나오고 알림만 끊긴다. 그러면
+        # "영상이 안 만들어진다"고 오해한 채 몇 주가 지나간다(실제로 그랬다).
+        # ::warning:: 으로 올리면 실행 요약의 Annotations에 바로 뜬다.
+        # 토큰 값은 예외 메시지에 들어가지 않지만, 길이를 잘라 한 번 더 막는다.
+        print(f"::warning::알림 전송 실패 ({type(e).__name__}: {str(e)[:120]}). "
+              "카카오 리프레시 토큰이 만료됐을 수 있습니다 — "
+              "scripts/get_kakao_token.py 로 재발급 후 KAKAO_REFRESH_TOKEN을 갱신하세요.")
