@@ -28,9 +28,30 @@ jobs:
           cache: pip
 
       - name: System deps (ffmpeg, Korean font)
+        timeout-minutes: 12
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q ffmpeg fonts-noto-cjk
+          # apt 미러가 멈춰 30분 잡 타임아웃으로 통째로 날아간 실행이 있었다(10/31, 11/7).
+          # ffmpeg과 한글 폰트는 러너 이미지에 이미 들어 있는 날이 많으니, 있으면 apt를 건너뛴다.
+          # 정말 설치가 필요한 날에만 받되, 한 번 멈췄다고 30분을 기다리지 않도록
+          # 시도마다 시간을 끊고 세 번까지 다시 해 본다.
+          need=""
+          command -v ffmpeg >/dev/null 2>&1 || need="$need ffmpeg"
+          fc-list :lang=ko 2>/dev/null | grep -qi noto || need="$need fonts-noto-cjk"
+          if [ -z "$need" ]; then
+            echo "ffmpeg·한글 폰트 모두 있음 — apt 건너뜀"
+            exit 0
+          fi
+          echo "설치 필요:$need"
+          for i in 1 2 3; do
+            if timeout 120 sudo apt-get update -q \
+               && timeout 240 sudo apt-get install -y -q $need; then
+              exit 0
+            fi
+            echo "apt 실패 ($i/3) — 20초 후 재시도"
+            sleep 20
+          done
+          echo "::error::apt 설치 실패 — ffmpeg/한글 폰트 없이는 진행할 수 없습니다"
+          exit 1
 
       - name: Python deps
         run: pip install -r requirements.txt
