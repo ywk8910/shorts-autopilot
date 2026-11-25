@@ -9,7 +9,7 @@ import shutil
 
 from . import config as C
 from .sources import fetch_all
-from .select_topic import load_state, save_state, select, uploads_today, today_kst
+from .select_topic import load_state, save_state, select, uploads_today, today_kst, _produced
 from .script_gen import generate
 from .insights import pick as pick_insight
 from .tts import synthesize, concat
@@ -91,7 +91,13 @@ def main() -> int:
         save_state(state)
         return 0
 
-    recent_kinds = [h.get("insight_kind", "none") for h in state["history"] if h.get("uploaded")]
+    # 주제 감점과 같은 기준(_produced)으로 "실제로 만든 편"을 본다.
+    # 전에는 uploaded로 걸렀는데, 검수 대기 중(upload_enabled=false)에는 uploaded가 영원히
+    # False라 9월에 올린 14편에서 멈춘 목록을 두 달째 들여다봤다. 감점이 사실상 꺼진 셈이라
+    # recovery_asymmetry가 최근 30편 중 15편(50%)을 가져갔고, 제목이 통째로 겹치기도
+    # 했다(11/14, 11/15). 같은 실수를 select_topic에서 한 번 고쳤는데 여기를 빠뜨렸다.
+    recent_kinds = [h["insight_kind"] for h in state["history"]
+                    if _produced(h) and h.get("insight_kind")]
     insight = pick_insight(topic, topics, recent_kinds)
     if insight:
         print(f"[insight] 선택: {insight.kind} ({insight.score:.0f}점)")
