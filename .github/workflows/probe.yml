@@ -21,6 +21,7 @@ jobs:
           sys.path.insert(0, ".")
           from shorts.sources import fx_rates, market
           from shorts.insights import data_day
+          from shorts.select_topic import zscore
           now = dt.datetime.now(dt.timezone.utc)
           out = [f"NOW KST {(now + dt.timedelta(hours=9)):%Y-%m-%d %H:%M}"]
           for mod in (fx_rates, market):
@@ -28,7 +29,7 @@ jobs:
                   for t in mod.fetch():
                       s = t["series"]
                       out.append(f"{t['id']:11} 마지막 {s[-1][0]} {s[-1][1]:>10,.2f} | 직전 {s[-2][0]} {s[-2][1]:>10,.2f} | "
-                                 f"{t['change_pct']:+6.2f}% | long {len(t['long'])}개 {t['long'][0][0]}~ | 대본 '{data_day(t)}'")
+                                 f"{t['change_pct']:+6.2f}% z{zscore(t):.1f} | long {len(t['long'])}개 {t['long'][0][0]}~ | 대본 '{data_day(t)}'")
               except Exception as e:
                   out.append(f"{mod.__name__} ERR {type(e).__name__}: {e}")
           txt = "\n".join(out)
