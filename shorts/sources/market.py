@@ -28,6 +28,10 @@ CLOSE_UTC = {
 }
 
 
+# 어느 시장의 하루인가. 'us'면 대본에서 데이터 날짜 대신 '간밤'이라고 말한다(insights.data_day).
+SESSION = {"CL=F": "us", "GC=F": "us"}
+
+
 def _drop_open_bar(long: list[tuple[str, float]], ticker: str,
                    now: datetime | None = None) -> list[tuple[str, float]]:
     """마감 전인 오늘 봉을 뺀다. 휴장일이면 오늘 봉이 없으니 그대로 둔다."""
@@ -66,7 +70,7 @@ def fetch() -> list[dict]:
         chg, facts = _facts(name, s, unit)
         out.append({
             "id": tid, "title_kw": name, "unit": unit, "series": s, "long": long, "latest": s[-1][1],
-            "change_pct": chg, "context": facts,
+            "change_pct": chg, "context": facts, "session": SESSION.get(ticker, "local"),
             "source_name": "Yahoo Finance", "source_url": f"https://finance.yahoo.com/quote/{ticker}",
             "chart_kind": "line",
             "hashtags": tags,
