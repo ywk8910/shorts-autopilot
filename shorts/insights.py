@@ -9,7 +9,7 @@
 탐지기 추가 방법: detect_*(topic, others) -> Insight | None 을 만들고 DETECTORS에 등록.
 """
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 
 @dataclass
@@ -56,17 +56,27 @@ def _kdate(s: str, ref: str | None = None) -> str:
     return f"{d.month}월 {d.day}일"
 
 
-def data_day(topic: dict) -> str:
-    """대본에서 '오늘' 대신 쓰는 데이터 날짜. 예: '11월 26일'.
+def data_day(topic: dict, now: datetime | None = None) -> str:
+    """대본에서 '오늘' 대신 쓰는 데이터 날짜. 예: '11월 27일', 미국 시장은 '간밤'.
 
-    06:00 KST에 돌기 때문에 그 시점에 받을 수 있는 최신 종가는 항상 전 거래일이다.
-    그걸 '오늘'이라고 읽으면 화면 하단 '기준일'과 어긋난다(실측: 11/27 영상이
-    "오늘 국제 금값은…"이라 읽으면서 기준일 2026-11-26을 띄웠다).
-    월요일 아침엔 최신 종가가 금요일이라 '어제'도 틀리고, 영상을 하루 늦게 올려도
-    날짜는 그대로 맞으므로 날짜를 직접 쓴다. 기준일 표기와 같은 값(series 마지막
-    날짜)에서 뽑아야 둘이 절대 어긋나지 않는다.
+    시청 시점과 데이터 날짜는 다르다. 환율·국내 지수는 그날 장 마감 값이어도 영상을
+    다음 날 볼 수 있고, 월요일엔 최신 종가가 금요일이라 '오늘/어제'는 쉽게 틀린다.
+    그래서 날짜를 직접 쓴다. 화면 하단 '기준일'과 같은 값(series 마지막 날짜)에서
+    뽑아야 둘이 절대 어긋나지 않는다(실측: 11/27 영상이 "오늘 국제 금값은…"이라
+    읽으면서 기준일 2026-11-26을 띄웠다).
+
+    미국 시장(금·유가)은 한국 시간 다음날 아침에 마감하므로, 오후에 볼 수 있는 가장
+    최신 확정값은 늘 '간밤' 뉴욕 장이다. 날짜로 말하면 하루 묵은 숫자처럼 들리니
+    뉴스처럼 '간밤'이라고 한다. 단, 데이터가 정확히 전날일 때만 — 월요일엔 최신이
+    금요일 장이라 '간밤'이 틀리므로 그땐 날짜로 돌아간다.
     """
-    return _kdate(topic["series"][-1][0])
+    d = topic["series"][-1][0]
+    if topic.get("session") == "us":
+        now = now or datetime.now(timezone.utc)
+        kst_today = (now + timedelta(hours=9)).date()
+        if _d(d) == kst_today - timedelta(days=1):
+            return "간밤"
+    return _kdate(d)
 
 
 def _batchim(word: str) -> bool:
@@ -282,7 +292,7 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
         # 훅은 짧게. 2초 안에 읽혀야 한다.
         hook = f"{name}, {when} {tgt} {word}입니다."
 
-        body = [f"{data_day(topic)} 기준 {_j(name)} {_fmt(latest, unit)}, 그 선을 {pos:.2f}% {sideword} 있습니다."]
+        body = [f"{data_day(topic)} 마감 기준 {_j(name)} {_fmt(latest, unit)}, 그 선을 {pos:.2f}% {sideword} 있습니다."]
         if bars > 1:
             body.append(f"넘어선 지 {bars}거래일째입니다." if going_up
                         else f"내준 지 {bars}거래일째입니다.")
@@ -372,7 +382,7 @@ def detect_divergence(topic: dict, others: list[dict]) -> Insight | None:
         hook=f"{data_day(topic)} {_j(na)} {ua}는데 {_j(nb)} {ub}습니다.",
         body=[
             f"{na} {a:+.2f}%, {nb} {b:+.2f}%입니다.",
-            f"올해 {year_days}거래일 중 두 지표가 반대로 간 날은 {data_day(topic)} 포함 {cnt}일뿐입니다.",
+            f"올해 {year_days}거래일 중 두 지표가 반대로 간 날은 이번을 포함해 {cnt}일뿐입니다.",
             f"{_j(na)} {_fmt(topic['latest'], topic['unit'])}, "
             f"{_j(nb)} {_fmt(peer['latest'], peer['unit'])}입니다.",
         ],
