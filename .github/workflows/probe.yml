@@ -1,5 +1,5 @@
 name: probe-fx
-# 임시 점검용. 환율 당일 소스 후보와 장중 봉 날짜 표기를 확인한다. 확인이 끝나면 지운다.
+# 임시 점검용. 실제 소스 코드로 7개 지표의 최신 데이터 날짜·값·대본용 날짜 표현을 확인한다. 확인이 끝나면 지운다.
 on:
   workflow_dispatch:
 permissions:
@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -16,41 +17,20 @@ jobs:
       - name: probe
         shell: python
         run: |
-          import os, datetime as dt, urllib.request
-          import yfinance as yf
-          out = []
-          P = out.append
+          import os, sys, datetime as dt
+          sys.path.insert(0, ".")
+          from shorts.sources import fx_rates, market
+          from shorts.insights import data_day
           now = dt.datetime.now(dt.timezone.utc)
-          kst = now + dt.timedelta(hours=9)
-          P(f"NOW UTC {now:%Y-%m-%d %H:%M} / KST {kst:%Y-%m-%d %H:%M}")
-          for t in ["^KS11", "GC=F", "CL=F", "KRW=X", "JPYKRW=X", "EURKRW=X"]:
+          out = [f"NOW KST {(now + dt.timedelta(hours=9)):%Y-%m-%d %H:%M}"]
+          for mod in (fx_rates, market):
               try:
-                  df = yf.Ticker(t).history(period="5d", interval="1d", auto_adjust=False)
-                  rows = [(d.strftime("%m-%d %H:%M%z"), round(float(v), 4)) for d, v in df["Close"].dropna().tail(3).items()]
-                  P(f"D1  {t:9} {rows}")
+                  for t in mod.fetch():
+                      s = t["series"]
+                      out.append(f"{t['id']:11} 마지막 {s[-1][0]} {s[-1][1]:>10,.2f} | 직전 {s[-2][0]} {s[-2][1]:>10,.2f} | "
+                                 f"{t['change_pct']:+6.2f}% | long {len(t['long'])}개 {t['long'][0][0]}~ | 대본 '{data_day(t)}'")
               except Exception as e:
-                  P(f"D1  {t:9} ERR {type(e).__name__}: {str(e)[:120]}")
-          for t in ["KRW=X", "JPYKRW=X", "EURKRW=X"]:
-              try:
-                  df = yf.Ticker(t).history(period="5d", interval="30m", auto_adjust=False)
-                  k = df["Close"].dropna()
-                  k.index = k.index.tz_convert("Asia/Seoul")
-                  sel = k[(k.index.hour == 15)]
-                  P(f"30M {t:9} 15시대 {[(d.strftime('%m-%d %H:%M'), round(float(v), 4)) for d, v in sel.tail(6).items()]}")
-                  P(f"30M {t:9} 마지막 {k.index[-1]:%m-%d %H:%M} {round(float(k.iloc[-1]), 4)}")
-              except Exception as e:
-                  P(f"30M {t:9} ERR {type(e).__name__}: {str(e)[:120]}")
-          def get(u):
-              try:
-                  return urllib.request.urlopen(u, timeout=20).read().decode()[:900]
-              except Exception as e:
-                  return f"ERR {type(e).__name__}: {e}"
-          end = kst.strftime("%Y%m%d")
-          start = (kst - dt.timedelta(days=7)).strftime("%Y%m%d")
-          for code in ["731Y001", "731Y003"]:
-              P(f"ECOS items {code}: " + get(f"https://ecos.bok.or.kr/api/StatisticItemList/sample/json/kr/1/10/{code}"))
-              P(f"ECOS data  {code}/0000001: " + get(f"https://ecos.bok.or.kr/api/StatisticSearch/sample/json/kr/1/10/{code}/D/{start}/{end}/0000001"))
-          P("FRANKFURTER: " + get("https://api.frankfurter.app/latest?from=USD&to=KRW"))
+                  out.append(f"{mod.__name__} ERR {type(e).__name__}: {e}")
           txt = "\n".join(out)
           print(txt)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
