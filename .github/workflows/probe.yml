@@ -1,0 +1,57 @@
+name: probe-fx
+# 임시 점검용. 환율 당일 소스 후보와 장중 봉 날짜 표기를 확인한다. 확인이 끝나면 지운다.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -q yfinance requests
+      - name: probe
+        shell: python
+        run: |
+          import os, datetime as dt, urllib.request
+          import yfinance as yf
+          out = []
+          P = out.append
+          now = dt.datetime.now(dt.timezone.utc)
+          kst = now + dt.timedelta(hours=9)
+          P(f"NOW UTC {now:%Y-%m-%d %H:%M} / KST {kst:%Y-%m-%d %H:%M}")
+          for t in ["^KS11", "GC=F", "CL=F", "KRW=X", "JPYKRW=X", "EURKRW=X"]:
+              try:
+                  df = yf.Ticker(t).history(period="5d", interval="1d", auto_adjust=False)
+                  rows = [(d.strftime("%m-%d %H:%M%z"), round(float(v), 4)) for d, v in df["Close"].dropna().tail(3).items()]
+                  P(f"D1  {t:9} {rows}")
+              except Exception as e:
+                  P(f"D1  {t:9} ERR {type(e).__name__}: {str(e)[:120]}")
+          for t in ["KRW=X", "JPYKRW=X", "EURKRW=X"]:
+              try:
+                  df = yf.Ticker(t).history(period="5d", interval="30m", auto_adjust=False)
+                  k = df["Close"].dropna()
+                  k.index = k.index.tz_convert("Asia/Seoul")
+                  sel = k[(k.index.hour == 15)]
+                  P(f"30M {t:9} 15시대 {[(d.strftime('%m-%d %H:%M'), round(float(v), 4)) for d, v in sel.tail(6).items()]}")
+                  P(f"30M {t:9} 마지막 {k.index[-1]:%m-%d %H:%M} {round(float(k.iloc[-1]), 4)}")
+              except Exception as e:
+                  P(f"30M {t:9} ERR {type(e).__name__}: {str(e)[:120]}")
+          def get(u):
+              try:
+                  return urllib.request.urlopen(u, timeout=20).read().decode()[:900]
+              except Exception as e:
+                  return f"ERR {type(e).__name__}: {e}"
+          end = kst.strftime("%Y%m%d")
+          start = (kst - dt.timedelta(days=7)).strftime("%Y%m%d")
+          for code in ["731Y001", "731Y003"]:
+              P(f"ECOS items {code}: " + get(f"https://ecos.bok.or.kr/api/StatisticItemList/sample/json/kr/1/10/{code}"))
+              P(f"ECOS data  {code}/0000001: " + get(f"https://ecos.bok.or.kr/api/StatisticSearch/sample/json/kr/1/10/{code}/D/{start}/{end}/0000001"))
+          P("FRANKFURTER: " + get("https://api.frankfurter.app/latest?from=USD&to=KRW"))
+          txt = "\n".join(out)
+          print(txt)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("```\n" + txt + "\n```\n")
