@@ -3,6 +3,8 @@ import json
 import os
 import re
 
+from .insights import data_day
+
 SYSTEM = """당신은 한국어 데이터 해설 숏폼 대본 작가입니다.
 규칙:
 - 주어진 '훅'과 '사실 문장'에 있는 숫자만 사용하세요. 새로운 숫자를 만들지 마세요.
@@ -12,6 +14,7 @@ SYSTEM = """당신은 한국어 데이터 해설 숏폼 대본 작가입니다.
 - 주어진 '정리'와 '다음 예고' 문장은 반드시 마지막 두 문장으로 그대로 유지하세요(다듬는 것은 허용).
 - 훅에서 던진 질문의 답이 '정리' 바로 앞에 오도록 순서를 지키세요.
 - 감정 자극 표현(충격, 폭락, 망했다) 금지. 사실과 맥락만.
+- "오늘", "어제"라고 쓰지 마세요. 데이터 날짜가 시청 시점과 다릅니다. 날짜가 필요하면 사실 문장에 있는 날짜(예: 11월 26일)를 그대로 쓰세요.
 반드시 JSON으로만 답하세요: {"title": "...", "lines": ["...", "..."]}
 title은 35자 이내, 궁금증을 남기되 낚시성 표현은 쓰지 마세요."""
 
@@ -79,15 +82,27 @@ def _clean_title(title: str, banned: list[str]) -> str:
     return re.sub(r"\s+", " ", title).strip()[:60]
 
 
+# '오늘'이 낱말로 쓰인 경우만 잡는다. '#오늘의숫자' 같은 태그나 '오늘날'은 건드리지 않는다.
+_TODAY = re.compile(r"(?<![#가-힣])(오늘|어제)(?=[\s,은는이가의도만]|$)")
+
+
+def _no_today(text: str, day: str) -> str:
+    """LLM은 구어체로 다듬다가 '오늘'을 다시 넣는다. 지시만으로는 못 막으니 결과에서 바꾼다.
+
+    데이터는 전 거래일 종가이거나 시청 시점보다 앞선 값이라 '오늘/어제'는 틀리기 쉽다.
+    """
+    return _TODAY.sub(day, text)
+
+
 def _fallback(topic: dict, insight) -> dict:
     """LLM 없이도 성립하는 대본. 인사이트가 있으면 그것이 뼈대가 된다."""
     if insight:
         lines = _assemble(insight)
         title = insight.title or insight.hook
     else:
-        lines = [f"{topic['title_kw']}, 오늘 {topic['latest']:,.2f}{topic['unit']}입니다."] \
+        lines = [f"{data_day(topic)} {topic['title_kw']}, {topic['latest']:,.2f}{topic['unit']}입니다."] \
             + topic["context"][1:] + [CLOSING]
-        title = f"{topic['title_kw']} 오늘 {topic['change_pct']:+.1f}%, 무슨 일이 있었나"
+        title = f"{topic['title_kw']} {topic['change_pct']:+.1f}%, 무슨 일이 있었나"
         lines = lines[:8]
     return {"title": title, "lines": lines}   # 인사이트 대본은 자르지 않는다 (마무리 두 줄 보호)
 
@@ -125,7 +140,10 @@ def generate(topic: dict, llm_cfg: dict, banned: list[str], insight=None, max_se
             out = _fallback(topic, insight)
 
     out["title"] = _clean_title(out["title"], banned)
-    lines = [l.strip() for l in out["lines"] if l.strip()][:10]
+    day = data_day(topic)
+    # 제목은 업로드가 늦어지면 날짜가 낡아 보이므로 날짜로 바꾸지 않고 말만 뺀다.
+    out["title"] = re.sub(r"(?<![#가-힣])(오늘|어제)\s+", "", out["title"]).strip()
+    lines = [_no_today(l.strip(), day) for l in out["lines"] if l.strip()][:10]
     # 마무리 두 줄이 빠지면 강제로 복원한다 (LLM이 잘라먹는 경우 대비)
     if insight and lines:
         tail = " ".join(lines[-2:])
