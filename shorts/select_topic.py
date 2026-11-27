@@ -69,6 +69,19 @@ def _recent_count(state: dict, topic_id: str) -> int:
     return recent.count(topic_id)
 
 
+def _already_told(state: dict, topic: dict) -> bool:
+    """이 주제를 이 날짜의 데이터로 이미 영상을 만들었나.
+
+    주말·휴장일엔 새 종가가 없어 마지막 데이터가 그대로다. 그런데도 돌면 같은 숫자로
+    같은 영상을 또 만든다(실측: 11/14 토·11/15 일, 제목까지 똑같은 영상 두 편).
+    데이터 날짜를 기록해 두고, 이미 다룬 (주제, 날짜)는 후보에서 뺀다.
+    예전 기록엔 data_date가 없으니 막지 않는다.
+    """
+    d = topic["series"][-1][0]
+    return any(h.get("topic_id") == topic["id"] and h.get("data_date") == d
+               for h in state["history"])
+
+
 def zscore(topic: dict) -> float:
     """오늘 변동률 ÷ 이 지표의 일간 변동 표준편차. 표본이 부족하면 1.0으로 중립 처리."""
     s = topic.get("long") or topic["series"]
@@ -95,13 +108,16 @@ def select(topics: list[dict], state: dict, safety: dict) -> tuple[dict | None, 
     min_z = safety.get("min_z_to_post", 1.0)
     min_abs = safety.get("min_change_pct_to_post", 0.2)
 
-    cands, log = [], []
+    cands, log, stale = [], [], []
     for t in topics:
         chg = abs(t["change_pct"])
         if chg >= safety["anomaly_change_pct"]:
             return None, f"이상치 감지: {t['id']} {t['change_pct']:+.1f}% — 데이터 확인 필요"
 
         if chg < min_abs:                       # 움직임 자체가 없는 날은 할 말이 없다
+            continue
+        if _already_told(state, t):             # 새 데이터가 없다 (주말·휴장일)
+            stale.append(t["id"])
             continue
         if _streak(state, t["id"]) >= safety["same_topic_max_streak"]:
             continue
@@ -115,8 +131,13 @@ def select(topics: list[dict], state: dict, safety: dict) -> tuple[dict | None, 
         log.append(f"{t['id']}:z{z:.1f}" + ("" if tier else "(평범)")
                    + (f"/최근{rep}회" if rep else ""))
 
+    if stale:
+        print("[select] 이미 다룬 데이터라 제외: " + ", ".join(stale))
     if not cands:
-        return None, f"움직임이 |{min_abs}%| 이상인 지표가 없음 (오늘은 건너뜀)"
+        why = f"움직임이 |{min_abs}%| 이상인 지표가 없음"
+        if stale:
+            why = f"새 데이터 없음({len(stale)}개 지표는 이미 다룬 날짜) — " + why
+        return None, why + " (오늘은 건너뜀)"
 
     cands.sort(key=lambda x: (-x[0], -x[1]))
     print("[select] " + ", ".join(log))
