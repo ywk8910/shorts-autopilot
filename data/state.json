@@ -729,6 +729,17 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 3.473
+    },
+    {
+      "date": "2026-11-27",
+      "topic_id": "fx_eurkrw",
+      "template": "counter",
+      "insight_kind": "milestone",
+      "title": "원/유로 환율, 1,500원선까지 1.6%",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 0.31,
+      "data_date": "2026-11-26"
     }
   ],
   "weights": {}
