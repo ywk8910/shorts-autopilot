@@ -2,7 +2,7 @@
 
 주의: 지수·유가는 '사실 서술'만 합니다. 매수/매도 권유 문장은 script_gen의 SYSTEM 규칙으로 차단됩니다.
 """
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 
 import yfinance as yf
 
@@ -41,6 +41,23 @@ def _drop_open_bar(long: list[tuple[str, float]], ticker: str,
     return long
 
 
+def _warn_if_stale(long: list[tuple[str, float]], ticker: str, now: datetime | None = None) -> None:
+    """국내 지수인데 장 마감 뒤에도 오늘 봉이 없으면 실행 요약에 경고를 띄운다.
+
+    Yahoo는 국내 지수 일봉을 마감 직후 바로 갱신하지 않는다. 실측(11/27): 코스피는
+    17:12에 이미 최종 종가였지만 코스닥은 17:12에 미반영, 17:32에야 +8.13%로 들어왔다.
+    그래서 실행을 18:17로 늦췄는데, 관측이 하루치뿐이라 늦는 날을 바로 알아채도록 남긴다.
+    휴장일엔 오늘 봉이 원래 없으므로 그날의 경고는 무시하면 된다.
+    """
+    if CLOSE_UTC.get(ticker) != time(6, 30) or not long:
+        return
+    now = now or datetime.now(timezone.utc)
+    kst = now.astimezone(timezone(timedelta(hours=9)))
+    if kst.weekday() < 5 and kst.time() >= time(15, 30) and long[-1][0] != kst.date().isoformat():
+        print(f"::warning::{ticker} 당일({kst:%m/%d}) 종가가 아직 없습니다(최신 {long[-1][0]}). "
+              "데이터 갱신이 늦은 날이거나 휴장일입니다.")
+
+
 def _facts(name: str, s: list[tuple[str, float]], unit: str) -> tuple[float, list[str]]:
     latest_d, latest = s[-1]
     prev = s[-2][1]
@@ -66,6 +83,7 @@ def fetch() -> list[dict]:
             continue
         long = [(d.strftime("%Y-%m-%d"), round(float(v), 2)) for d, v in df["Close"].dropna().items()]
         long = _drop_open_bar(long, ticker)
+        _warn_if_stale(long, ticker)
         s = long[-65:]
         chg, facts = _facts(name, s, unit)
         out.append({
