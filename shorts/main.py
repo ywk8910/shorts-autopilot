@@ -144,7 +144,9 @@ def main() -> int:
     state["history"].append({"date": today, "topic_id": topic["id"], "template": template,
                              "insight_kind": script.get("insight_kind", "none"),
                              "title": script["title"], "video_id": video_id, "uploaded": uploaded,
-                             "change_pct": round(topic["change_pct"], 3)})
+                             "change_pct": round(topic["change_pct"], 3),
+                             # 어떤 날짜의 데이터로 만들었나. select()가 같은 데이터로 또 만드는 걸 막는다.
+                             "data_date": topic["series"][-1][0]})
     save_state(state)
     if uploaded:
         head = "업로드 완료 (비공개)"
