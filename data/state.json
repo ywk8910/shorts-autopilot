@@ -740,6 +740,17 @@
       "uploaded": false,
       "change_pct": 0.31,
       "data_date": "2026-11-26"
+    },
+    {
+      "date": "2026-11-28",
+      "topic_id": "fx_jpykrw",
+      "template": "line",
+      "insight_kind": "recovery_asymmetry",
+      "title": "원/100엔 환율 14% 하락, 되돌리려면 16% 필요한 이유",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": -0.404,
+      "data_date": "2026-11-27"
     }
   ],
   "weights": {}
