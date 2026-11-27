@@ -56,6 +56,19 @@ def _kdate(s: str, ref: str | None = None) -> str:
     return f"{d.month}월 {d.day}일"
 
 
+def data_day(topic: dict) -> str:
+    """대본에서 '오늘' 대신 쓰는 데이터 날짜. 예: '11월 26일'.
+
+    06:00 KST에 돌기 때문에 그 시점에 받을 수 있는 최신 종가는 항상 전 거래일이다.
+    그걸 '오늘'이라고 읽으면 화면 하단 '기준일'과 어긋난다(실측: 11/27 영상이
+    "오늘 국제 금값은…"이라 읽으면서 기준일 2026-11-26을 띄웠다).
+    월요일 아침엔 최신 종가가 금요일이라 '어제'도 틀리고, 영상을 하루 늦게 올려도
+    날짜는 그대로 맞으므로 날짜를 직접 쓴다. 기준일 표기와 같은 값(series 마지막
+    날짜)에서 뽑아야 둘이 절대 어긋나지 않는다.
+    """
+    return _kdate(topic["series"][-1][0])
+
+
 def _batchim(word: str) -> bool:
     """마지막 글자에 받침이 있는지 (조사 선택용)."""
     c = word.strip()[-1] if word.strip() else ""
@@ -102,7 +115,7 @@ def detect_recovery_asymmetry(topic: dict, others: list[dict]) -> Insight | None
         score=min(95.0, abs(dd) * 2.5),
         hook=f"{abs(dd):.0f}% 빠진 {name}, 왜 {need:.0f}%가 올라야 제자리일까요?",
         body=[
-            f"오늘 {_j(name)} {_fmt(latest, unit)}입니다.",
+            f"{data_day(topic)} {_j(name)} {_fmt(latest, unit)}입니다.",
             f"최근 1년 고점은 {_kdate(hi_d, s[-1][0])}의 {_fmt(hi, unit)}, 거기서 {abs(dd):.1f}% 내려왔습니다.",
             f"그런데 그 고점을 되찾으려면 여기서 {need:.1f}%가 올라야 합니다.",
             "떨어질 때는 큰 숫자에서 빼고, 오를 때는 작아진 숫자에서 더하기 때문입니다.",
@@ -154,7 +167,7 @@ def detect_streak(topic: dict, others: list[dict]) -> Insight | None:
         hook=f"{_j(name, '이가')} {n}일 연속 {word}했습니다. 올해 {kth}번째입니다.",
         body=[
             f"{n}거래일 동안 누적 {total:+.1f}% 움직였습니다.",
-            f"오늘 하루만 {topic['change_pct']:+.2f}%입니다.",
+            f"{data_day(topic)} 하루 변동은 {topic['change_pct']:+.2f}%입니다.",
             f"올해 {n}일 이상 연속 {word}이 나온 건 이번이 {kth}번째입니다.",
             f"현재 수치는 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
@@ -194,7 +207,7 @@ def detect_rarity(topic: dict, others: list[dict]) -> Insight | None:
         score=min(94.0, 95 - pct * 4),
         hook=hook,
         body=[
-            f"오늘 {_j(name)} {abs(topic['change_pct']):.2f}% {word}했습니다.",
+            f"{data_day(topic)} {_j(name)} {abs(topic['change_pct']):.2f}% {word}했습니다.",
             detail,
             f"현재 {_fmt(s[-1][1], topic['unit'])}입니다.",
         ],
@@ -269,7 +282,7 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
         # 훅은 짧게. 2초 안에 읽혀야 한다.
         hook = f"{name}, {when} {tgt} {word}입니다."
 
-        body = [f"오늘 {_j(name)} {_fmt(latest, unit)}, 그 선을 {pos:.2f}% {sideword} 있습니다."]
+        body = [f"{data_day(topic)} 기준 {_j(name)} {_fmt(latest, unit)}, 그 선을 {pos:.2f}% {sideword} 있습니다."]
         if bars > 1:
             body.append(f"넘어선 지 {bars}거래일째입니다." if going_up
                         else f"내준 지 {bars}거래일째입니다.")
@@ -301,7 +314,7 @@ def detect_milestone(topic: dict, others: list[dict]) -> Insight | None:
         score=75.0 if gap <= 1.0 else 58.0,
         hook=f"{name}, {tgt}선까지 {gap:.2f}% 남았습니다.",
         body=[
-            f"오늘 {_j(name)} {_fmt(latest, unit)}입니다.",
+            f"{data_day(topic)} {_j(name)} {_fmt(latest, unit)}입니다.",
             f"{tgt}까지는 {_fmt(up_lv - latest, unit)}, {gap:.2f}% 거리입니다.",
             (f"마지막으로 그 위에 있던 날은 {_kdate(above[-1], s[-1][0])}입니다." if above
              else f"최근 {span} 동안 {tgt}를 넘은 적은 없습니다."),
@@ -356,10 +369,10 @@ def detect_divergence(topic: dict, others: list[dict]) -> Insight | None:
     return Insight(
         kind="divergence",
         score=58.0 + (1 - rate) * 42,          # 드물수록 높은 점수
-        hook=f"오늘 {_j(na)} {ua}는데 {_j(nb)} {ub}습니다.",
+        hook=f"{data_day(topic)} {_j(na)} {ua}는데 {_j(nb)} {ub}습니다.",
         body=[
             f"{na} {a:+.2f}%, {nb} {b:+.2f}%입니다.",
-            f"올해 {year_days}거래일 중 두 지표가 반대로 간 날은 오늘 포함 {cnt}일뿐입니다.",
+            f"올해 {year_days}거래일 중 두 지표가 반대로 간 날은 {data_day(topic)} 포함 {cnt}일뿐입니다.",
             f"{_j(na)} {_fmt(topic['latest'], topic['unit'])}, "
             f"{_j(nb)} {_fmt(peer['latest'], peer['unit'])}입니다.",
         ],
@@ -393,7 +406,7 @@ def detect_life_translation(topic: dict, others: list[dict]) -> Insight | None:
             score=72.0,
             hook=f"지금 환율이면 100달러 직구에 3개월 전보다 {abs(diff):,.0f}원을 {word} 내야 합니다.",
             body=[
-                f"오늘 원/달러 환율은 {latest:,.0f}원입니다.",
+                f"{data_day(topic)} 원/달러 환율은 {latest:,.0f}원입니다.",
                 f"100달러짜리를 사면 {now100:,.0f}원, {_kdate(past_d, s[-1][0])}에는 {then100:,.0f}원이었습니다.",
                 f"같은 물건인데 {abs(diff):,.0f}원 차이가 납니다.",
                 f"3개월 새 환율이 {(latest / past - 1) * 100:+.1f}% 움직인 결과입니다.",
