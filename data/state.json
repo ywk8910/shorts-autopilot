@@ -719,6 +719,16 @@
       "video_id": null,
       "uploaded": false,
       "change_pct": 1.314
+    },
+    {
+      "date": "2026-11-27",
+      "topic_id": "mkt_gold",
+      "template": "line",
+      "insight_kind": "rarity",
+      "title": "국제 금값 +3.5%, 1년 중 상위 6.0%",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 3.473
     }
   ],
   "weights": {}
