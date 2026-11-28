@@ -751,6 +751,17 @@
       "uploaded": false,
       "change_pct": -0.404,
       "data_date": "2026-11-27"
+    },
+    {
+      "date": "2026-11-29",
+      "topic_id": "mkt_kosdaq",
+      "template": "counter",
+      "insight_kind": "rarity",
+      "title": "코스닥 지수 +8.1%, 1년 중 상위 2.1%",
+      "video_id": null,
+      "uploaded": false,
+      "change_pct": 8.126,
+      "data_date": "2026-11-27"
     }
   ],
   "weights": {}
